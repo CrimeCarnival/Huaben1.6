@@ -318,111 +318,213 @@
     </div>
     
     <!-- Crous像素工坊标签页 -->
+
     <div id="crousimg" class="tab-content active">
-        <div class="container">
-            <h1>像素工坊</h1>
 
-            <!-- 左侧区域：缩略图和控制 -->
-            <div>
-                <!-- 文件上传 -->
-                <div class="crousimg-controls">
-                    <label for="folderInput">选择文件夹:</label>
-                    <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*">
-                </div>
+        <h1>Crous像素工坊</h1>
 
-                <!-- 缩略图区域 -->
-                <div class="thumbnails" id="thumbnails"></div>
 
-                <!-- 控制按钮 -->
-                <div class="crousimg-controls">
-                    <div>
-                        <label for="widthInput">宽度 (cm):</label>
-                        <input type="number" id="widthInput" value="29.7" min="1" step="0.01">
-                    </div>
-                    <div>
-                        <label for="heightInput">高度 (cm):</label>
-                        <input type="number" id="heightInput" value="21" min="1" step="0.01">
-                    </div>
-                    <button class="crousimg-button" id="swapButton">交换宽高</button>
 
-                    <!-- DPI 设置 -->
-                    <div class="dpi-setting">
-                        <label for="dpiInput">DPI:</label>
-                        <input type="number" id="dpiInput" value="300" min="1">
-                        <small>(建议范围: 300-360)</small>
-                    </div>
+        <!-- 左侧区域：缩略图和控制 -->
 
-                    <!-- 边距设置 -->
-                    <div class="margin-controls">
-                        <div>
-                            <label for="marginTopInput">上边距 (mm):</label>
-                            <input type="number" id="marginTopInput" value="0" min="0">
-                        </div>
-                        <div>
-                            <label for="marginBottomInput">下边距 (mm):</label>
-                            <input type="number" id="marginBottomInput" value="0" min="0">
-                        </div>
-                        <div>
-                            <label for="marginLeftInput">左边距 (mm):</label>
-                            <input type="number" id="marginLeftInput" value="0" min="0">
-                        </div>
-                        <div>
-                            <label for="marginRightInput">右边距 (mm):</label>
-                            <input type="number" id="marginRightInput" value="0" min="0">
-                        </div>
-                    </div>
+        <div>
 
-                    <button class="crousimg-button" id="resizeButton">调整图片大小</button>
-                    <button class="crousimg-button" id="exportButton">批量导出为压缩包</button>
+            <!-- 文件上传 -->
 
-                    <!-- 常用尺寸按钮 -->
-                    <div class="preset-buttons">
-                        <button class="crousimg-button" data-preset="A5">A5 (14.8×21)</button>
-                        <button class="crousimg-button" data-preset="A4">A4 (29.7×21)</button>
-                        <button class="crousimg-button" data-preset="A3">A3 (29.7×42)</button>
-                        <button class="crousimg-button" data-preset="3inch">3寸 (5.1×7.6)</button>
-                        <button class="crousimg-button" data-preset="5inch">5寸 (8.9×12.7)</button>
-                        <button class="crousimg-button" data-preset="6inch">6寸 (10.2×15.2)</button>
-                    </div>
+            <div class="crousimg-controls">
 
-                    <!-- 其他尺寸菜单 -->
-                    <div class="preset-menu">
-                        <label for="presetSelect">其他尺寸:</label>
-                        <select id="presetSelect">
-                            <option value="">请选择尺寸</option>
-                            <option value="A2">A2 (42×59.4)</option>
-                            <option value="A1">A1 (59.4×84.1)</option>
-                            <option value="1inch">1寸 (2.5×3.5)</option>
-                            <option value="2inch">2寸 (3.5×4.5)</option>
-                            <option value="7inch">7寸 (12.7×17.8)</option>
-                            <option value="8inch">8寸 (15.2×20.3)</option>
-                            <option value="10inch">10寸 (20.3×25.4)</option>
-                            <option value="12inch">12寸 (25.4×30.5)</option>
-                            <option value="14inch">14寸 (28×35.6)</option>
-                            <option value="16inch">16寸 (30.5×40.6)</option>
-                            <option value="18inch">18寸 (35.6×45.7)</option>
-                            <option value="20inch">20寸 (40.6×50.8)</option>
-                            <option value="24inch">24寸 (50.8×61)</option>
-                            <option value="30inch">30寸 (61×76.2)</option>
-                            <option value="32inch">32寸 (66×81.3)</option>
-                            <option value="36inch">36寸 (61×91.4)</option>
-                        </select>
-                    </div>
-                </div>
+                <label for="folderInput">选择文件夹:</label>
 
-                <!-- 进度条 -->
-                <div class="progress-bar-container">
-                    <div class="progress-bar" id="progressBar"></div>
-                </div>
+                <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*">
+
             </div>
 
-            <!-- 右侧区域：预览 -->
-            <div class="preview-container">
-                <h2>预览</h2>
-                <img id="previewImage" src="" alt="预览图片" style="display: none;">
-                <div class="preview-dimensions" id="previewDimensions"></div>
+
+
+            <!-- 缩略图区域 -->
+
+            <div class="thumbnails" id="thumbnails"></div>
+
+
+
+            <!-- 控制按钮 -->
+
+            <div class="crousimg-controls">
+
+                <div>
+
+                    <label for="widthInput">宽度 (cm):</label>
+
+                    <input type="number" id="widthInput" value="29.7" min="1" step="0.01">
+
+                </div>
+
+                <div>
+
+                    <label for="heightInput">高度 (cm):</label>
+
+                    <input type="number" id="heightInput" value="21" min="1" step="0.01">
+
+                </div>
+
+                <button class="crousimg-button" id="swapButton">交换宽高</button>
+
+
+
+                <!-- DPI 设置 -->
+
+                <div class="dpi-setting">
+
+                    <label for="dpiInput">DPI:</label>
+
+                    <input type="number" id="dpiInput" value="300" min="1">
+
+                    <small>(建议范围: 300-360)</small>
+
+                </div>
+
+
+
+                <!-- 边距设置 -->
+
+                <div class="margin-controls">
+
+                    <div>
+
+                        <label for="marginTopInput">上边距 (mm):</label>
+
+                        <input type="number" id="marginTopInput" value="0" min="0">
+
+                    </div>
+
+                    <div>
+
+                        <label for="marginBottomInput">下边距 (mm):</label>
+
+                        <input type="number" id="marginBottomInput" value="0" min="0">
+
+                    </div>
+
+                    <div>
+
+                        <label for="marginLeftInput">左边距 (mm):</label>
+
+                        <input type="number" id="marginLeftInput" value="0" min="0">
+
+                    </div>
+
+                    <div>
+
+                        <label for="marginRightInput">右边距 (mm):</label>
+
+                        <input type="number" id="marginRightInput" value="0" min="0">
+
+                    </div>
+
+                </div>
+
+
+
+                <button class="crousimg-button" id="resizeButton">调整图片大小</button>
+
+                <button class="crousimg-button" id="exportButton">导出为PDF</button>
+
+
+
+                <!-- 常用尺寸按钮 -->
+
+                <div class="preset-buttons">
+
+                    <button class="crousimg-button" data-preset="A5">A5 (14.8×21)</button>
+
+                    <button class="crousimg-button" data-preset="A4">A4 (29.7×21)</button>
+
+                    <button class="crousimg-button" data-preset="A3">A3 (29.7×42)</button>
+
+                    <button class="crousimg-button" data-preset="3inch">3寸 (5.1×7.6)</button>
+
+                    <button class="crousimg-button" data-preset="5inch">5寸 (8.9×12.7)</button>
+
+                    <button class="crousimg-button" data-preset="6inch">6寸 (10.2×15.2)</button>
+
+                </div>
+
+
+
+                <!-- 其他尺寸菜单 -->
+
+                <div class="preset-menu">
+
+                    <label for="presetSelect">其他尺寸:</label>
+
+                    <select id="presetSelect">
+
+                        <option value="">请选择尺寸</option>
+
+                        <option value="A2">A2 (42×59.4)</option>
+
+                        <option value="A1">A1 (59.4×84.1)</option>
+
+                        <option value="1inch">1寸 (2.5×3.5)</option>
+
+                        <option value="2inch">2寸 (3.5×4.5)</option>
+
+                        <option value="7inch">7寸 (12.7×17.8)</option>
+
+                        <option value="8inch">8寸 (15.2×20.3)</option>
+
+                        <option value="10inch">10寸 (20.3×25.4)</option>
+
+                        <option value="12inch">12寸 (25.4×30.5)</option>
+
+                        <option value="14inch">14寸 (28×35.6)</option>
+
+                        <option value="16inch">16寸 (30.5×40.6)</option>
+
+                        <option value="18inch">18寸 (35.6×45.7)</option>
+
+                        <option value="20inch">20寸 (40.6×50.8)</option>
+
+                        <option value="24inch">24寸 (50.8×61)</option>
+
+                        <option value="30inch">30寸 (61×76.2)</option>
+
+                        <option value="32inch">32寸 (66×81.3)</option>
+
+                        <option value="36inch">36寸 (61×91.4)</option>
+
+                    </select>
+
+                </div>
+
             </div>
+
+
+
+            <!-- 进度条 -->
+
+            <div class="progress-bar-container">
+
+                <div class="progress-bar" id="progressBar"></div>
+
+            </div>
+
         </div>
+
+
+
+        <!-- 右侧区域：预览 -->
+
+        <div class="preview-container">
+
+            <h2>预览</h2>
+
+            <img id="previewImage" src="" alt="预览图片" style="display: none;">
+
+            <div class="preview-dimensions" id="previewDimensions"></div>
+
+        </div>
+
     </div>
     
     <!-- 智能有声书画本着色器标签页 -->
@@ -675,92 +777,227 @@
     });
 
     document.getElementById('exportButton').addEventListener('click', function() {
+
         if (allImages.length === 0) {
+
             alert('请先选择至少一张图片！');
+
             return;
+
         }
+
+
 
         const dpi = parseInt(document.getElementById('dpiInput').value);
 
+
+
         if (isNaN(dpi) || dpi <= 0) {
+
             alert('请输入有效的DPI值！');
+
             return;
+
         }
+
+
 
         const widthCm = parseFloat(document.getElementById('widthInput').value);
+
         const heightCm = parseFloat(document.getElementById('heightInput').value);
 
+
+
         if (isNaN(widthCm) || isNaN(heightCm) || widthCm <= 0 || heightCm <= 0) {
+
             alert('请输入有效的宽度和高度！');
+
             return;
+
         }
+
+
 
         const widthPx = cmToPx(widthCm, dpi);
+
         const heightPx = cmToPx(heightCm, dpi);
 
+
+
         const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value));
+
         const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value));
+
         const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value));
+
         const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value));
 
+
+
         // 检查边距是否超出设定尺寸
+
         if (marginTop + marginBottom >= heightPx || marginLeft + marginRight >= widthPx) {
+
             alert('边距设置超出图片尺寸，请重新输入边距值！');
+
             return;
+
         }
 
-        const zip = new JSZip();
-        let completedCount = 0;
+
+
+        // 创建jsPDF实例
+
+        const { jsPDF } = window.jspdf;
+
+        const pdf = new jsPDF({
+
+            orientation: widthCm > heightCm ? 'landscape' : 'portrait',
+
+            unit: 'cm',
+
+            format: [widthCm, heightCm]
+
+        });
+
+
+
+        let processedCount = 0;
+
+
+
+        // 更新进度条
+
+        const progressBar = document.getElementById('progressBar');
+
+
+
+        // 用于存储处理后的图片数据
+
+        const imagePromises = [];
+
+
 
         allImages.forEach((file, index) => {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.src = event.target.result;
 
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
+            const promise = new Promise((resolve) => {
 
-                    // 计算画布的实际尺寸（包括边距）
-                    canvas.width = widthPx;
-                    canvas.height = heightPx;
+                const reader = new FileReader();
 
-                    // 填充背景颜色为白色
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                reader.onload = function(event) {
 
-                    // 等比例缩放，多余部分留白
-                    const scale = Math.min((widthPx - marginLeft - marginRight) / img.width, (heightPx - marginTop - marginBottom) / img.height);
-                    const x = marginLeft + ((widthPx - marginLeft - marginRight) - img.width * scale) / 2;
-                    const y = marginTop + ((heightPx - marginTop - marginBottom) - img.height * scale) / 2;
+                    const img = new Image();
 
-                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                    img.src = event.target.result;
 
-                    // 将调整后的图片添加到压缩包
-                    const resizedDataUrl = canvas.toDataURL('image/jpeg');
-                    const base64Data = resizedDataUrl.split(',')[1];
-                    zip.file(`resized_${file.name}`, base64Data, { base64: true });
 
-                    // 更新进度条
-                    completedCount++;
-                    const progress = (completedCount / allImages.length) * 100;
-                    document.getElementById('progressBar').style.width = `${progress}%`;
 
-                    // 如果所有图片都处理完毕，则生成并下载压缩包
-                    if (completedCount === allImages.length) {
-                        zip.generateAsync({ type: 'blob' }).then(function(content) {
-                            const link = document.createElement('a');
-                            link.href = URL.createObjectURL(content);
-                            link.download = 'adjusted_images.zip';
-                            link.click();
-                        });
-                    }
+                    img.onload = function() {
+
+                        const canvas = document.createElement('canvas');
+
+                        const ctx = canvas.getContext('2d');
+
+
+
+                        // 计算画布的实际尺寸（包括边距）
+
+                        canvas.width = widthPx;
+
+                        canvas.height = heightPx;
+
+
+
+                        // 填充背景颜色为白色
+
+                        ctx.fillStyle = '#ffffff';
+
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+
+                        // 等比例缩放，多余部分留白
+
+                        const scale = Math.min((widthPx - marginLeft - marginRight) / img.width, (heightPx - marginTop - marginBottom) / img.height);
+
+                        const x = marginLeft + ((widthPx - marginLeft - marginRight) - img.width * scale) / 2;
+
+                        const y = marginTop + ((heightPx - marginTop - marginBottom) - img.height * scale) / 2;
+
+
+
+                        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+
+
+                        // 将调整后的图片添加到PDF
+
+                        const imgData = canvas.toDataURL('image/jpeg');
+
+
+
+                        // 添加新页面（如果是第二张图片及以后）
+
+                        if (index > 0) {
+
+                            pdf.addPage([widthCm, heightCm], widthCm > heightCm ? 'landscape' : 'portrait');
+
+                        }
+
+
+
+                        pdf.addImage(imgData, 'JPEG', 0, 0, widthCm, heightCm);
+
+
+
+                        // 更新进度条
+
+                        processedCount++;
+
+                        const progress = (processedCount / allImages.length) * 100;
+
+                        progressBar.style.width = `${progress}%`;
+
+
+
+                        resolve();
+
+                    };
+
                 };
-            };
 
-            reader.readAsDataURL(file);
+
+
+                reader.readAsDataURL(file);
+
+            });
+
+
+
+            imagePromises.push(promise);
+
         });
+
+
+
+        // 等待所有图片处理完成后保存PDF
+
+        Promise.all(imagePromises).then(() => {
+
+            pdf.save('adjusted_images.pdf');
+
+
+
+            // 重置进度条
+
+            setTimeout(() => {
+
+                progressBar.style.width = '0%';
+
+            }, 2000);
+
+        });
+
     });
 
     // 常用尺寸按钮事件
@@ -1133,7 +1370,17 @@
 </script>
 
 <!-- 引入JSZip库 -->
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
+
+
+<!-- 引入jsPDF库 -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+
+
 </body>
+
 </html>
