@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>智能有声书画本着色器（带应用按钮）</title>
+  <style>
+    body {
+      font-family: "Microsoft YaHei", sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #ffffff;
+      color: #333333;
+    }
+    h1 { text-align: center; color: #2c3e50; }
+    textarea {
+      width: 100%; height: 220px; padding: 12px;
+      font-size: 16px; border: 1px solid #ccc;
+      border-radius: 6px; margin-bottom: 15px;
+      font-family: inherit; background: #fff;
+      resize: vertical;
+    }
+    .controls {
+      display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;
+    }
+    button {
+      padding: 9px 16px; background: #2c3e50; color: white;
+      border: none; border-radius: 4px; cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background: #1a252f; }
+    .btn-apply { background: #27ae60; }
+    .btn-apply:hover { background: #219653; }
+    .btn-merge { background: #8E44AD; }
+    .btn-merge:hover { background: #7D3C98; }
+    #roleInput {
+      padding: 9px; font-size: 14px; border: 1px solid #999;
+      border-radius: 4px; flex: 1; min-width: 150px;
+    }
+    #output {
+      width: 100%; min-height: 250px; padding: 15px;
+      background: #fff; border: 1px solid #ddd;
+      border-radius: 6px; line-height: 1.6;
+      white-space: pre-wrap; overflow-wrap: break-word;
+      font-family: inherit; font-size: 16px;
+    }
+    .role-legend {
+      margin-top: 20px; padding: 15px;
+      background: #f8f9fa; border-radius: 6px;
+      border: 1px solid #eee;
+    }
+    .role-item {
+      display: flex; align-items: center;
+      margin-bottom: 12px; padding: 6px 0;
+    }
+    .color-box {
+      width: 24px; height: 24px;
+      border-radius: 4px;
+      margin-right: 10px;
+      border: 1px solid #aaa;
+      cursor: pointer;
+    }
+    .role-name {
+      font-weight: bold;
+      flex: 1;
+    }
+    .color-input {
+      width: 80px;
+      height: 30px;
+      padding: 0 8px;
+      border: 1px solid #999;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .action-cell {
+      display: flex; align-items: center;
+      margin-left: 10px;
+    }
+    .apply-btn {
+      margin-left: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+    select.merge-select {
+      font-size: 13px; padding: 4px 6px;
+      border: 1px solid #999; border-radius: 3px;
+      margin: 0 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 智能有声书画本着色器</h1>
+  <p>支持角色合并、自定义颜色，修改后请点击“应用”生效。</p>
+
+  <textarea id="input" placeholder="例如：
+小明：你好！
+【小明】今天真开心。
+小红：我们去玩吧！
+旁白：阳光明媚。
+"></textarea>
+
+  <div class="controls">
+    <button onclick="autoHighlight()">智能自动着色</button>
+    <input type="text" id="roleInput" placeholder="手动指定角色名" />
+    <button onclick="manualHighlight()">手动着色选中文本</button>
+    <button id="copyBtn" onclick="copyResult()">复制结果（保留格式）</button>
+  </div>
+
+  <h3>着色预览：</h3>
+  <div id="output"></div>
+
+  <div class="role-legend" id="legend">
+    <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center;">
+      <strong>角色颜色管理（修改后请点击“应用”）</strong>
+      <div>
+        <button class="btn-merge" onclick="applyRoleMerge()">✓ 应用角色合并</button>
+        <button class="btn-apply" onclick="applyAllColorChanges()" style="margin-left:8px;">✓ 应用所有颜色</button>
+      </div>
+    </div>
+    <div id="roleList"></div>
+  </div>
+
+  <script>
+    let roleColors = { "旁白": "#555555" };
+    let roleMapping = {};
+    // 临时存储用户修改的颜色（未应用）
+    let pendingColorChanges = {};
+
+    const defaultDeepColors = [
+      "#C62828", "#1565C0", "#2E7D32", "#5D4037",
+      "#6A1B9A", "#004D40", "#BF360C", "#3E2723",
+      "#880E4F", "#01579B", "#33691E", "#AD1457"
+    ];
+
+    function cleanRoleName(role) {
+      return role.trim()
+        .replace(/^【|】$/g, '')
+        .replace(/^「|」$/g, '')
+        .replace(/^"|"$/g, '')
+        .replace(/^“|”$/g, '')
+        .replace(/\s+/g, ' ');
+    }
+
+    function getRoleColor(role) {
+      const clean = cleanRoleName(role);
+      if (roleColors[clean]) return roleColors[clean];
+      const color = defaultDeepColors[Object.keys(roleColors).length % defaultDeepColors.length];
+      roleColors[clean] = color;
+      return color;
+    }
+
+    function updateLegend() {
+      const list = document.getElementById("roleList");
+      const roles = Object.keys(roleColors);
+      list.innerHTML = "";
+
+      if (roles.length === 0) {
+        list.innerHTML = "<p>暂无角色。</p>";
+        return;
+      }
+
+      roles.forEach(role => {
+        const currentColor = roleColors[role] || "#000000";
+        // 显示当前已应用的颜色（不是 pending）
+        const displayColor = pendingColorChanges[role] !== undefined ? pendingColorChanges[role] : currentColor;
+
+        const div = document.createElement("div");
+        div.className = "role-item";
+        div.innerHTML = `
+          <input type="color" class="color-box" value="${displayColor}" data-role="${role}">
+          <div class="role-name">${role}</div>
+          <input type="text" class="color-input" value="${displayColor}" data-role="${role}" maxlength="7">
+          <div class="action-cell">
+            <button class="apply-btn btn-apply" data-role="${role}" onclick="applyColorForRole('${role}')">应用</button>
+            <div style="margin-left:12px;">合并到：
+              <select class="merge-select" data-source="${role}">
+                <option value="">— 选择 —</option>
+                ${roles.filter(r => r !== role).map(r => 
+                  `<option value="${r}">${r}</option>`
+                ).join('')}
+              </select>
+            </div>
+          </div>
+        `;
+        list.appendChild(div);
+
+        // 绑定输入事件（仅更新 pending，不立即生效）
+        const colorBox = div.querySelector(".color-box");
+        const colorInput = div.querySelector(".color-input");
+
+        colorBox.addEventListener("input", function() {
+          pendingColorChanges[role] = this.value;
+          colorInput.value = this.value;
+        });
+
+        colorInput.addEventListener("input", function() {
+          let val = this.value.trim();
+          if (val && !val.startsWith("#")) val = "#" + val;
+          if (/^#[0-9A-F]{6}$/i.test(val)) {
+            pendingColorChanges[role] = val;
+            colorBox.value = val;
+          }
+        });
+      });
+    }
+
+    // 应用单个角色的颜色
+    function applyColorForRole(role) {
+      if (pendingColorChanges[role] !== undefined) {
+        roleColors[role] = pendingColorChanges[role];
+        delete pendingColorChanges[role];
+        rerenderOutput();
+        // 更新UI显示已应用状态（移除 pending 标记）
+        updateLegend();
+        console.log(`✅ 已应用颜色到角色: ${role}`);
+      }
+    }
+
+    // 一键应用所有待定颜色
+    function applyAllColorChanges() {
+      let count = 0;
+      for (const role in pendingColorChanges) {
+        roleColors[role] = pendingColorChanges[role];
+        count++;
+      }
+      if (count > 0) {
+        pendingColorChanges = {};
+        rerenderOutput();
+        updateLegend();
+        alert(`✅ 已应用 ${count} 个角色的颜色！`);
+      } else {
+        alert("ℹ️ 没有未应用的颜色修改。");
+      }
+    }
+
+    function applyRoleMerge() {
+      const selects = document.querySelectorAll(".merge-select");
+      let merged = false;
+      for (const sel of selects) {
+        const source = sel.dataset.source;
+        const target = sel.value;
+        if (target) {
+          roleMapping[source] = target;
+          roleColors[source] = roleColors[target]; // 继承颜色
+          merged = true;
+        }
+      }
+      if (merged) {
+        rerenderOutput();
+        updateLegend();
+        alert("✅ 角色合并完成！");
+      } else {
+        alert("ℹ️ 未选择合并项。");
+      }
+    }
+
+    function rerenderOutput() {
+      const text = document.getElementById("input").value;
+      if (!text.trim()) return;
+
+      const blocks = parseDialogue(text);
+      let html = "";
+
+      for (const block of blocks) {
+        if (block.type === 'dialogue') {
+          let stdRole = cleanRoleName(block.role);
+          if (roleMapping[stdRole]) stdRole = roleMapping[stdRole];
+          const color = roleColors[stdRole] || getRoleColor(stdRole);
+          const safeContent = escapeHtml(block.content).replace(/\n/g, "<br>");
+          html += `<span style="color:${color};">${safeContent}</span>\n`;
+        } else {
+          html += `<span>${escapeHtml(block.content).replace(/\n/g, "<br>")}</span>\n`;
+        }
+      }
+
+      document.getElementById("output").innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "<")
+        .replace(/>/g, ">")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // ===== 智能解析逻辑 =====
+    function parseDialogue(text) {
+      const lines = text.split('\n');
+      const result = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const rawLine = lines[i];
+        const line = rawLine.trim();
+        if (!line) {
+          result.push({ type: 'text', content: rawLine });
+          i++; continue;
+        }
+
+        let match = line.match(/^([【「"“]?[\u4e00-\u9fa5a-zA-Z0-9_\s]+?[】」"”]?)[：:\s　]+(.*)$/);
+        if (match && match[1].replace(/[【】「」"“”]/g, '').trim().length <= 12) {
+          const roleTag = match[1];
+          const roleClean = cleanRoleName(roleTag);
+          let dialogue = match[2];
+          let contentLines = [roleTag + '：' + dialogue];
+          i++;
+          while (i < lines.length && /^\s/.test(lines[i]) && lines[i].trim()) {
+            contentLines.push(lines[i]); i++;
+          }
+          result.push({ type: 'dialogue', role: roleClean, content: contentLines.join('\n') });
+          continue;
+        }
+
+        match = line.match(/^([\u4e00-\u9fa5a-zA-Z0-9_]{1,12})[：:\s　]+(.+)$/);
+        if (match) {
+          const role = match[1];
+          let dialogue = match[2];
+          let contentLines = [role + '：' + dialogue];
+          i++;
+          while (i < lines.length && /^\s/.test(lines[i]) && lines[i].trim()) {
+            contentLines.push(lines[i]); i++;
+          }
+          result.push({ type: 'dialogue', role: role, content: contentLines.join('\n') });
+          continue;
+        }
+
+        result.push({ type: 'text', content: rawLine });
+        i++;
+      }
+      return result;
+    }
+
+    function autoHighlight() {
+      const text = document.getElementById("input").value;
+      if (!text.trim()) return;
+
+      // 重置状态（可选）
+      roleMapping = {};
+      pendingColorChanges = {};
+
+      const blocks = parseDialogue(text);
+      roleColors = { "旁白": "#555555" };
+
+      let html = "";
+      for (const block of blocks) {
+        if (block.type === 'dialogue') {
+          const color = getRoleColor(block.role);
+          const safeContent = escapeHtml(block.content).replace(/\n/g, "<br>");
+          html += `<span style="color:${color};">${safeContent}</span>\n`;
+        } else {
+          html += `<span>${escapeHtml(block.content).replace(/\n/g, "<br>")}</span>\n`;
+        }
+      }
+
+      document.getElementById("output").innerHTML = html;
+      updateLegend();
+    }
+
+    function manualHighlight() {
+      const role = document.getElementById("roleInput").value.trim();
+      if (!role) return alert("请输入角色名");
+      const input = document.getElementById("input");
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const fullText = input.value;
+      if (start === end) return alert("请先选中一段文本");
+
+      const selected = fullText.substring(start, end);
+      const color = getRoleColor(role);
+      const safeSelected = escapeHtml(selected);
+      const before = escapeHtml(fullText.substring(0, start));
+      const after = escapeHtml(fullText.substring(end));
+
+      document.getElementById("output").innerHTML = 
+        (before + `<span style="color:${color};">${safeSelected}</span>` + after)
+        .replace(/\n/g, "<br>");
+
+      updateLegend();
+    }
+
+    function copyResult() {
+      const outputDiv = document.getElementById("output");
+      if (!outputDiv.innerHTML.trim()) return alert("请先生成结果");
+
+      const pre = document.createElement("pre");
+      pre.style.fontFamily = '"Microsoft YaHei", sans-serif';
+      pre.style.fontSize = "16px";
+      pre.style.whiteSpace = "pre";
+      pre.style.margin = "0"; pre.style.padding = "0";
+      pre.innerHTML = outputDiv.innerHTML;
+      pre.style.position = "fixed"; pre.style.left = "-9999px";
+      document.body.appendChild(pre);
+
+      const range = document.createRange();
+      range.selectNode(pre);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+
+      let success = false;
+      try { success = document.execCommand("copy"); } catch (e) {}
+
+      window.getSelection().removeAllRanges();
+      document.body.removeChild(pre);
+
+      if (success) {
+        alert("✅ 已复制！颜色、换行、缩进已保留。");
+      } else {
+        alert("⚠️ 请手动复制预览区内容。");
+      }
+    }
+
+    updateLegend();
+  </script>
+</body>
+</html>
