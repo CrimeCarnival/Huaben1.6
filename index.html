@@ -1,127 +1,844 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>智能有声书画本着色器（带应用按钮）</title>
-  <style>
-    body {
-      font-family: "Microsoft YaHei", sans-serif;
-      max-width: 900px;
-      margin: 20px auto;
-      padding: 20px;
-      background-color: #ffffff;
-      color: #333333;
-    }
-    h1 { text-align: center; color: #2c3e50; }
-    textarea {
-      width: 100%; height: 220px; padding: 12px;
-      font-size: 16px; border: 1px solid #ccc;
-      border-radius: 6px; margin-bottom: 15px;
-      font-family: inherit; background: #fff;
-      resize: vertical;
-    }
-    .controls {
-      display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;
-    }
-    button {
-      padding: 9px 16px; background: #2c3e50; color: white;
-      border: none; border-radius: 4px; cursor: pointer;
-      font-size: 14px;
-    }
-    button:hover { background: #1a252f; }
-    .btn-apply { background: #27ae60; }
-    .btn-apply:hover { background: #219653; }
-    .btn-merge { background: #8E44AD; }
-    .btn-merge:hover { background: #7D3C98; }
-    #roleInput {
-      padding: 9px; font-size: 14px; border: 1px solid #999;
-      border-radius: 4px; flex: 1; min-width: 150px;
-    }
-    #output {
-      width: 100%; min-height: 250px; padding: 15px;
-      background: #fff; border: 1px solid #ddd;
-      border-radius: 6px; line-height: 1.6;
-      white-space: pre-wrap; overflow-wrap: break-word;
-      font-family: inherit; font-size: 16px;
-    }
-    .role-legend {
-      margin-top: 20px; padding: 15px;
-      background: #f8f9fa; border-radius: 6px;
-      border: 1px solid #eee;
-    }
-    .role-item {
-      display: flex; align-items: center;
-      margin-bottom: 12px; padding: 6px 0;
-    }
-    .color-box {
-      width: 24px; height: 24px;
-      border-radius: 4px;
-      margin-right: 10px;
-      border: 1px solid #aaa;
-      cursor: pointer;
-    }
-    .role-name {
-      font-weight: bold;
-      flex: 1;
-    }
-    .color-input {
-      width: 80px;
-      height: 30px;
-      padding: 0 8px;
-      border: 1px solid #999;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-    .action-cell {
-      display: flex; align-items: center;
-      margin-left: 10px;
-    }
-    .apply-btn {
-      margin-left: 8px;
-      padding: 4px 10px;
-      font-size: 12px;
-    }
-    select.merge-select {
-      font-size: 13px; padding: 4px 6px;
-      border: 1px solid #999; border-radius: 3px;
-      margin: 0 6px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crous工具集</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 30px;
+        }
+        /* 标签页样式 */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab-button {
+            padding: 12px 24px;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* Crousimg 页面样式 */
+        .crousimg-controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .crousimg-controls input[type="number"] {
+            width: 120px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .crousimg-controls label {
+            font-weight: bold;
+        }
+        .crousimg-button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .crousimg-button:hover {
+            background-color: #45a049;
+        }
+        .preset-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .preset-buttons .crousimg-button {
+            flex: 1;
+            background-color: #007bff;
+            min-width: 120px;
+        }
+        .preset-buttons .crousimg-button:hover {
+            background-color: #0056b3;
+        }
+        .thumbnails {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .thumbnails img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border: 2px solid transparent;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .thumbnails img:hover {
+            transform: scale(1.1);
+            border-color: #4CAF50;
+        }
+        .thumbnails img.selected {
+            border-color: #4CAF50;
+            transform: scale(1.1);
+        }
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #fafafa;
+        }
+        .preview-container img {
+            max-width: 100%;
+            max-height: 400px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        .progress-bar-container {
+            margin-top: 20px;
+            width: 100%;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 10px;
+            background-color: #4CAF50;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        .margin-controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .margin-controls div {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .margin-controls label {
+            flex: 1;
+        }
+        .margin-controls input {
+            flex: 2;
+        }
+        .dpi-setting {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .dpi-setting small {
+            font-size: 12px;
+            color: #666;
+        }
+        .preview-dimensions {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+        .preset-menu {
+            margin-top: 10px;
+        }
+        .preset-menu select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        /* HB1.6 页面样式 */
+        .hb-textarea {
+            width: 100%; 
+            height: 220px; 
+            padding: 12px;
+            font-size: 16px; 
+            border: 1px solid #ccc;
+            border-radius: 6px; 
+            margin-bottom: 15px;
+            font-family: inherit; 
+            background: #fff;
+            resize: vertical;
+        }
+        .hb-controls {
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 15px; 
+            flex-wrap: wrap;
+        }
+        .hb-button {
+            padding: 9px 16px; 
+            background: #2c3e50; 
+            color: white;
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .hb-button:hover { 
+            background: #1a252f; 
+        }
+        .btn-apply { 
+            background: #27ae60; 
+        }
+        .btn-apply:hover { 
+            background: #219653; 
+        }
+        .btn-merge { 
+            background: #8E44AD; 
+        }
+        .btn-merge:hover { 
+            background: #7D3C98; 
+        }
+        #roleInput {
+            padding: 9px; 
+            font-size: 14px; 
+            border: 1px solid #999;
+            border-radius: 4px; 
+            flex: 1; 
+            min-width: 150px;
+        }
+        #output {
+            width: 100%; 
+            min-height: 250px; 
+            padding: 15px;
+            background: #fff; 
+            border: 1px solid #ddd;
+            border-radius: 6px; 
+            line-height: 1.6;
+            white-space: pre-wrap; 
+            overflow-wrap: break-word;
+            font-family: inherit; 
+            font-size: 16px;
+        }
+        .role-legend {
+            margin-top: 20px; 
+            padding: 15px;
+            background: #f8f9fa; 
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .role-item {
+            display: flex; 
+            align-items: center;
+            margin-bottom: 12px; 
+            padding: 6px 0;
+        }
+        .color-box {
+            width: 24px; 
+            height: 24px;
+            border-radius: 4px;
+            margin-right: 10px;
+            border: 1px solid #aaa;
+            cursor: pointer;
+        }
+        .role-name {
+            font-weight: bold;
+            flex: 1;
+        }
+        .color-input {
+            width: 80px;
+            height: 30px;
+            padding: 0 8px;
+            border: 1px solid #999;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .action-cell {
+            display: flex; 
+            align-items: center;
+            margin-left: 10px;
+        }
+        .apply-btn {
+            margin-left: 8px;
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        select.merge-select {
+            font-size: 13px; 
+            padding: 4px 6px;
+            border: 1px solid #999; 
+            border-radius: 3px;
+            margin: 0 6px;
+        }
+    </style>
 </head>
 <body>
-  <h1>🎨 智能有声书画本着色器</h1>
-  <p>支持角色合并、自定义颜色，修改后请点击“应用”生效。</p>
 
-  <textarea id="input" placeholder="例如：
+<div class="container">
+    <h1>Crous工具集</h1>
+    
+    <!-- 标签页导航 -->
+    <div class="tabs">
+        <button class="tab-button active" data-tab="crousimg">像素工坊</button>
+        <button class="tab-button" data-tab="hb16">智能画本</button>
+    </div>
+    
+    <!-- Crous像素工坊标签页 -->
+    <div id="crousimg" class="tab-content active">
+        <div class="container">
+            <h1>像素工坊</h1>
+
+            <!-- 左侧区域：缩略图和控制 -->
+            <div>
+                <!-- 文件上传 -->
+                <div class="crousimg-controls">
+                    <label for="folderInput">选择文件夹:</label>
+                    <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*">
+                </div>
+
+                <!-- 缩略图区域 -->
+                <div class="thumbnails" id="thumbnails"></div>
+
+                <!-- 控制按钮 -->
+                <div class="crousimg-controls">
+                    <div>
+                        <label for="widthInput">宽度 (cm):</label>
+                        <input type="number" id="widthInput" value="29.7" min="1" step="0.01">
+                    </div>
+                    <div>
+                        <label for="heightInput">高度 (cm):</label>
+                        <input type="number" id="heightInput" value="21" min="1" step="0.01">
+                    </div>
+                    <button class="crousimg-button" id="swapButton">交换宽高</button>
+
+                    <!-- DPI 设置 -->
+                    <div class="dpi-setting">
+                        <label for="dpiInput">DPI:</label>
+                        <input type="number" id="dpiInput" value="300" min="1">
+                        <small>(建议范围: 300-360)</small>
+                    </div>
+
+                    <!-- 边距设置 -->
+                    <div class="margin-controls">
+                        <div>
+                            <label for="marginTopInput">上边距 (mm):</label>
+                            <input type="number" id="marginTopInput" value="0" min="0">
+                        </div>
+                        <div>
+                            <label for="marginBottomInput">下边距 (mm):</label>
+                            <input type="number" id="marginBottomInput" value="0" min="0">
+                        </div>
+                        <div>
+                            <label for="marginLeftInput">左边距 (mm):</label>
+                            <input type="number" id="marginLeftInput" value="0" min="0">
+                        </div>
+                        <div>
+                            <label for="marginRightInput">右边距 (mm):</label>
+                            <input type="number" id="marginRightInput" value="0" min="0">
+                        </div>
+                    </div>
+
+                    <button class="crousimg-button" id="resizeButton">调整图片大小</button>
+                    <button class="crousimg-button" id="exportButton">批量导出为压缩包</button>
+
+                    <!-- 常用尺寸按钮 -->
+                    <div class="preset-buttons">
+                        <button class="crousimg-button" data-preset="A5">A5 (14.8×21)</button>
+                        <button class="crousimg-button" data-preset="A4">A4 (29.7×21)</button>
+                        <button class="crousimg-button" data-preset="A3">A3 (29.7×42)</button>
+                        <button class="crousimg-button" data-preset="3inch">3寸 (5.1×7.6)</button>
+                        <button class="crousimg-button" data-preset="5inch">5寸 (8.9×12.7)</button>
+                        <button class="crousimg-button" data-preset="6inch">6寸 (10.2×15.2)</button>
+                    </div>
+
+                    <!-- 其他尺寸菜单 -->
+                    <div class="preset-menu">
+                        <label for="presetSelect">其他尺寸:</label>
+                        <select id="presetSelect">
+                            <option value="">请选择尺寸</option>
+                            <option value="A2">A2 (42×59.4)</option>
+                            <option value="A1">A1 (59.4×84.1)</option>
+                            <option value="1inch">1寸 (2.5×3.5)</option>
+                            <option value="2inch">2寸 (3.5×4.5)</option>
+                            <option value="7inch">7寸 (12.7×17.8)</option>
+                            <option value="8inch">8寸 (15.2×20.3)</option>
+                            <option value="10inch">10寸 (20.3×25.4)</option>
+                            <option value="12inch">12寸 (25.4×30.5)</option>
+                            <option value="14inch">14寸 (28×35.6)</option>
+                            <option value="16inch">16寸 (30.5×40.6)</option>
+                            <option value="18inch">18寸 (35.6×45.7)</option>
+                            <option value="20inch">20寸 (40.6×50.8)</option>
+                            <option value="24inch">24寸 (50.8×61)</option>
+                            <option value="30inch">30寸 (61×76.2)</option>
+                            <option value="32inch">32寸 (66×81.3)</option>
+                            <option value="36inch">36寸 (61×91.4)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 进度条 -->
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+
+            <!-- 右侧区域：预览 -->
+            <div class="preview-container">
+                <h2>预览</h2>
+                <img id="previewImage" src="" alt="预览图片" style="display: none;">
+                <div class="preview-dimensions" id="previewDimensions"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 智能有声书画本着色器标签页 -->
+    <div id="hb16" class="tab-content">
+        <h1>🎨 有声书智能画本</h1>
+        <p>将文本粘贴到上面后点击"智能自动着色"生效。</p>
+
+        <textarea class="hb-textarea" id="input" placeholder="例如：
 小明：你好！
 【小明】今天真开心。
 小红：我们去玩吧！
 旁白：阳光明媚。
 "></textarea>
 
-  <div class="controls">
-    <button onclick="autoHighlight()">智能自动着色</button>
-    <input type="text" id="roleInput" placeholder="手动指定角色名" />
-    <button onclick="manualHighlight()">手动着色选中文本</button>
-    <button id="copyBtn" onclick="copyResult()">复制结果（保留格式）</button>
-  </div>
+        <div class="hb-controls">
+            <button class="hb-button" onclick="autoHighlight()">智能自动着色</button>
+            <input type="text" id="roleInput" placeholder="指定角色名" />
+            <button class="hb-button" onclick="manualHighlight()">选中文本手动着色</button>
+            <button class="hb-button" id="copyBtn" onclick="copyResult()">复制结果</button>
+        </div>
 
-  <h3>着色预览：</h3>
-  <div id="output"></div>
+        <h3>着色预览：</h3>
+        <div id="output"></div>
 
-  <div class="role-legend" id="legend">
-    <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center;">
-      <strong>角色颜色管理（修改后请点击“应用”）</strong>
-      <div>
-        <button class="btn-merge" onclick="applyRoleMerge()">✓ 应用角色合并</button>
-        <button class="btn-apply" onclick="applyAllColorChanges()" style="margin-left:8px;">✓ 应用所有颜色</button>
-      </div>
+        <div class="role-legend" id="legend">
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center;">
+                <strong>角色颜色管理（修改后请点击"应用"）</strong>
+                <div>
+                    <button class="hb-button btn-merge" onclick="applyRoleMerge()">✓ 应用角色合并</button>
+                    <button class="hb-button btn-apply" onclick="applyAllColorChanges()" style="margin-left:8px;">✓ 应用所有颜色</button>
+                </div>
+            </div>
+            <div id="roleList"></div>
+        </div>
     </div>
-    <div id="roleList"></div>
-  </div>
+</div>
 
-  <script>
+<script>
+    // 标签页切换功能
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            // 移除所有活动状态
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 添加当前活动状态
+            button.classList.add('active');
+            const tabId = button.getAttribute('data-tab');
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
+    
+    // Crousimg 功能的 JavaScript 代码
+    let allImages = [];
+
+    document.getElementById('folderInput').addEventListener('change', function(event) {
+        const files = event.target.files;
+        const thumbnailsContainer = document.getElementById('thumbnails');
+        thumbnailsContainer.innerHTML = ''; // 清空之前的缩略图
+        allImages = Array.from(files).filter(file => file.type.startsWith('image/'));
+
+        allImages.forEach(file => {
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.alt = file.name;
+                img.dataset.file = file;
+
+                img.addEventListener('click', function() {
+                    // 移除其他图片的选中状态
+                    document.querySelectorAll('.thumbnails img').forEach(img => img.classList.remove('selected'));
+                    img.classList.add('selected'); // 设置当前图片为选中状态
+
+                    // 显示调整后的图片在预览窗口
+                    adjustAndPreviewImage(file);
+                });
+
+                thumbnailsContainer.appendChild(img);
+            };
+
+            reader.readAsDataURL(file);
+        });
+    });
+
+    function adjustAndPreviewImage(file) {
+        const dpi = parseInt(document.getElementById('dpiInput').value);
+
+        if (isNaN(dpi) || dpi <= 0) {
+            alert('请输入有效的DPI值！');
+            return;
+        }
+
+        const widthCm = parseFloat(document.getElementById('widthInput').value);
+        const heightCm = parseFloat(document.getElementById('heightInput').value);
+
+        if (isNaN(widthCm) || isNaN(heightCm) || widthCm <= 0 || heightCm <= 0) {
+            alert('请输入有效的宽度和高度！');
+            return;
+        }
+
+        const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value));
+        const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value));
+        const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value));
+        const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value));
+
+               // 转换为像素
+               const widthPx = cmToPx(widthCm, dpi);
+        const heightPx = cmToPx(heightCm, dpi);
+
+        // 检查边距是否超出设定尺寸
+        if (marginTop + marginBottom >= heightPx || marginLeft + marginRight >= widthPx) {
+            alert('边距设置超出图片尺寸，请重新输入边距值！');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.src = event.target.result;
+
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // 计算画布的实际尺寸（包括边距）
+                canvas.width = widthPx;
+                canvas.height = heightPx;
+
+                // 填充背景颜色为白色
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 等比例缩放，多余部分留白
+                const scale = Math.min((widthPx - marginLeft - marginRight) / img.width, (heightPx - marginTop - marginBottom) / img.height);
+                const x = marginLeft + ((widthPx - marginLeft - marginRight) - img.width * scale) / 2;
+                const y = marginTop + ((heightPx - marginTop - marginBottom) - img.height * scale) / 2;
+
+                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+                // 更新预览图片
+                const previewImage = document.getElementById('previewImage');
+                previewImage.src = canvas.toDataURL('image/jpeg');
+                previewImage.style.display = 'block';
+
+                // 更新预览尺寸显示
+                const previewDimensions = document.getElementById('previewDimensions');
+                previewDimensions.textContent = `当前尺寸: ${widthCm} cm x ${heightCm} cm`;
+            };
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    document.getElementById('swapButton').addEventListener('click', function() {
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
+
+        const temp = widthInput.value;
+        widthInput.value = heightInput.value;
+        heightInput.value = temp;
+
+        // 交换宽高后直接更新预览
+        const selectedThumbnail = document.querySelector('.thumbnails img.selected');
+        if (selectedThumbnail) {
+            const file = selectedThumbnail.dataset.file;
+            adjustAndPreviewImage(file);
+        }
+    });
+
+    document.getElementById('resizeButton').addEventListener('click', function() {
+        if (allImages.length === 0) {
+            alert('请先选择至少一张图片！');
+            return;
+        }
+
+        const dpi = parseInt(document.getElementById('dpiInput').value);
+
+        if (isNaN(dpi) || dpi <= 0) {
+            alert('请输入有效的DPI值！');
+            return;
+        }
+
+        const widthCm = parseFloat(document.getElementById('widthInput').value);
+        const heightCm = parseFloat(document.getElementById('heightInput').value);
+
+        if (isNaN(widthCm) || isNaN(heightCm) || widthCm <= 0 || heightCm <= 0) {
+            alert('请输入有效的宽度和高度！');
+            return;
+        }
+
+        const widthPx = cmToPx(widthCm, dpi);
+        const heightPx = cmToPx(heightCm, dpi);
+
+        const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value));
+        const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value));
+        const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value));
+        const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value));
+
+        // 检查边距是否超出设定尺寸
+        if (marginTop + marginBottom >= heightPx || marginLeft + marginRight >= widthPx) {
+            alert('边距设置超出图片尺寸，请重新输入边距值！');
+            return;
+        }
+
+        const progressBar = document.getElementById('progressBar');
+        progressBar.style.width = '0%';
+
+        let completedCount = 0;
+
+        allImages.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.src = event.target.result;
+
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // 计算画布的实际尺寸（包括边距）
+                    canvas.width = widthPx;
+                    canvas.height = heightPx;
+
+                    // 填充背景颜色为白色
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // 等比例缩放，多余部分留白
+                    const scale = Math.min((widthPx - marginLeft - marginRight) / img.width, (heightPx - marginTop - marginBottom) / img.height);
+                    const x = marginLeft + ((widthPx - marginLeft - marginRight) - img.width * scale) / 2;
+                    const y = marginTop + ((heightPx - marginTop - marginBottom) - img.height * scale) / 2;
+
+                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+                    // 更新进度条
+                    completedCount++;
+                    const progress = (completedCount / allImages.length) * 100;
+                    progressBar.style.width = `${progress}%`;
+                };
+            };
+
+            reader.readAsDataURL(file);
+        });
+    });
+
+    document.getElementById('exportButton').addEventListener('click', function() {
+        if (allImages.length === 0) {
+            alert('请先选择至少一张图片！');
+            return;
+        }
+
+        const dpi = parseInt(document.getElementById('dpiInput').value);
+
+        if (isNaN(dpi) || dpi <= 0) {
+            alert('请输入有效的DPI值！');
+            return;
+        }
+
+        const widthCm = parseFloat(document.getElementById('widthInput').value);
+        const heightCm = parseFloat(document.getElementById('heightInput').value);
+
+        if (isNaN(widthCm) || isNaN(heightCm) || widthCm <= 0 || heightCm <= 0) {
+            alert('请输入有效的宽度和高度！');
+            return;
+        }
+
+        const widthPx = cmToPx(widthCm, dpi);
+        const heightPx = cmToPx(heightCm, dpi);
+
+        const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value));
+        const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value));
+        const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value));
+        const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value));
+
+        // 检查边距是否超出设定尺寸
+        if (marginTop + marginBottom >= heightPx || marginLeft + marginRight >= widthPx) {
+            alert('边距设置超出图片尺寸，请重新输入边距值！');
+            return;
+        }
+
+        const zip = new JSZip();
+        let completedCount = 0;
+
+        allImages.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.src = event.target.result;
+
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // 计算画布的实际尺寸（包括边距）
+                    canvas.width = widthPx;
+                    canvas.height = heightPx;
+
+                    // 填充背景颜色为白色
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // 等比例缩放，多余部分留白
+                    const scale = Math.min((widthPx - marginLeft - marginRight) / img.width, (heightPx - marginTop - marginBottom) / img.height);
+                    const x = marginLeft + ((widthPx - marginLeft - marginRight) - img.width * scale) / 2;
+                    const y = marginTop + ((heightPx - marginTop - marginBottom) - img.height * scale) / 2;
+
+                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+                    // 将调整后的图片添加到压缩包
+                    const resizedDataUrl = canvas.toDataURL('image/jpeg');
+                    const base64Data = resizedDataUrl.split(',')[1];
+                    zip.file(`resized_${file.name}`, base64Data, { base64: true });
+
+                    // 更新进度条
+                    completedCount++;
+                    const progress = (completedCount / allImages.length) * 100;
+                    document.getElementById('progressBar').style.width = `${progress}%`;
+
+                    // 如果所有图片都处理完毕，则生成并下载压缩包
+                    if (completedCount === allImages.length) {
+                        zip.generateAsync({ type: 'blob' }).then(function(content) {
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(content);
+                            link.download = 'adjusted_images.zip';
+                            link.click();
+                        });
+                    }
+                };
+            };
+
+            reader.readAsDataURL(file);
+        });
+    });
+
+    // 常用尺寸按钮事件
+    document.querySelectorAll('.preset-buttons button').forEach(button => {
+        button.addEventListener('click', function() {
+            const preset = this.dataset.preset;
+
+            let widthCm, heightCm; // 默认单位为厘米
+            switch (preset) {
+                case 'A5': widthCm = 14.8; heightCm = 21; break;
+                case 'A4': widthCm = 29.7; heightCm = 21; break;
+                case 'A3': widthCm = 29.7; heightCm = 42; break;
+                case '3inch': widthCm = 5.1; heightCm = 7.6; break;
+                case '5inch': widthCm = 8.9; heightCm = 12.7; break;
+                case '6inch': widthCm = 10.2; heightCm = 15.2; break;
+            }
+
+            document.getElementById('widthInput').value = widthCm.toFixed(2); // 保留两位小数
+            document.getElementById('heightInput').value = heightCm.toFixed(2);
+
+            // 更新预览
+            const selectedThumbnail = document.querySelector('.thumbnails img.selected');
+            if (selectedThumbnail) {
+                const file = selectedThumbnail.dataset.file;
+                adjustAndPreviewImage(file);
+            }
+        });
+    });
+
+    // 其他尺寸菜单事件
+    document.getElementById('presetSelect').addEventListener('change', function() {
+        const preset = this.value;
+
+        if (!preset) return;
+
+        let widthCm, heightCm; // 默认单位为厘米
+        switch (preset) {
+            case 'A2': widthCm = 42; heightCm = 59.4; break;
+            case 'A1': widthCm = 59.4; heightCm = 84.1; break;
+            case '1inch': widthCm = 2.5; heightCm = 3.5; break;
+            case '2inch': widthCm = 3.5; heightCm = 4.5; break;
+            case '7inch': widthCm = 12.7; heightCm = 17.8; break;
+            case '8inch': widthCm = 15.2; heightCm = 20.3; break;
+            case '10inch': widthCm = 20.3; heightCm = 25.4; break;
+            case '12inch': widthCm = 25.4; heightCm = 30.5; break;
+            case '14inch': widthCm = 28; heightCm = 35.6; break;
+            case '16inch': widthCm = 30.5; heightCm = 40.6; break;
+            case '18inch': widthCm = 35.6; heightCm = 45.7; break;
+            case '20inch': widthCm = 40.6; heightCm = 50.8; break;
+            case '24inch': widthCm = 50.8; heightCm = 61; break;
+            case '30inch': widthCm = 61; heightCm = 76.2; break;
+            case '32inch': widthCm = 66; heightCm = 81.3; break;
+            case '36inch': widthCm = 61; heightCm = 91.4; break;
+        }
+
+        document.getElementById('widthInput').value = widthCm.toFixed(2); // 保留两位小数
+        document.getElementById('heightInput').value = heightCm.toFixed(2);
+
+        // 更新预览
+        const selectedThumbnail = document.querySelector('.thumbnails img.selected');
+        if (selectedThumbnail) {
+            const file = selectedThumbnail.dataset.file;
+            adjustAndPreviewImage(file);
+        }
+    });
+
+    // 将厘米转换为像素
+    function cmToPx(cm, dpi) {
+        return Math.round(cm * dpi / 2.54);
+    }
+
+    // 将毫米转换为像素
+    function mmToPx(mm) {
+        const dpi = parseInt(document.getElementById('dpiInput').value);
+        return Math.round(mm * dpi / 25.4);
+    }
+    
+    // HB1.6 功能的 JavaScript 代码
     let roleColors = { "旁白": "#555555" };
     let roleMapping = {};
     // 临时存储用户修改的颜色（未应用）
@@ -413,6 +1130,10 @@
     }
 
     updateLegend();
-  </script>
+</script>
+
+<!-- 引入JSZip库 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
 </body>
 </html>
