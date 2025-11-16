@@ -317,11 +317,14 @@
         <button class="tab-button" data-tab="hb16">智能画本</button>
     </div>
     
-    <!-- Crous像素工坊标签页 -->
+    <!-- 像素工坊标签页 -->
 
     <div id="crousimg" class="tab-content active">
 
-  
+        <h1>像素工坊</h1>
+
+
+
         <!-- 左侧区域：缩略图和控制 -->
 
         <div>
@@ -333,6 +336,12 @@
                 <label for="folderInput">选择文件夹:</label>
 
                 <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*">
+
+                
+
+                <label for="fileInput">选择文件 (可多选):</label>
+
+                <input type="file" id="fileInput" multiple accept="image/*" capture="environment" onclick="if(/iPhone|iPad|iPod/i.test(navigator.userAgent)) {this.removeAttribute('capture');}">
 
             </div>
 
@@ -579,37 +588,131 @@
     });
     
     // Crousimg 功能的 JavaScript 代码
+
     let allImages = [];
 
+
+
     document.getElementById('folderInput').addEventListener('change', function(event) {
+
         const files = event.target.files;
+
         const thumbnailsContainer = document.getElementById('thumbnails');
+
         thumbnailsContainer.innerHTML = ''; // 清空之前的缩略图
+
         allImages = Array.from(files).filter(file => file.type.startsWith('image/'));
 
+
+
         allImages.forEach(file => {
+
             const reader = new FileReader();
 
+
+
             reader.onload = function(e) {
+
                 const img = document.createElement('img');
+
                 img.src = e.target.result;
+
                 img.alt = file.name;
+
                 img.dataset.file = file;
 
+
+
                 img.addEventListener('click', function() {
+
                     // 移除其他图片的选中状态
+
                     document.querySelectorAll('.thumbnails img').forEach(img => img.classList.remove('selected'));
+
                     img.classList.add('selected'); // 设置当前图片为选中状态
 
+
+
                     // 显示调整后的图片在预览窗口
+
                     adjustAndPreviewImage(file);
+
                 });
 
+
+
                 thumbnailsContainer.appendChild(img);
+
             };
 
+
+
             reader.readAsDataURL(file);
+
         });
+
+    });
+
+
+
+    document.getElementById('fileInput').addEventListener('change', function(event) {
+
+        const files = event.target.files;
+
+        const thumbnailsContainer = document.getElementById('thumbnails');
+
+        thumbnailsContainer.innerHTML = ''; // 清空之前的缩略图
+
+        allImages = Array.from(files).filter(file => file.type.startsWith('image/'));
+
+
+
+        allImages.forEach(file => {
+
+            const reader = new FileReader();
+
+
+
+            reader.onload = function(e) {
+
+                const img = document.createElement('img');
+
+                img.src = e.target.result;
+
+                img.alt = file.name;
+
+                img.dataset.file = file;
+
+
+
+                img.addEventListener('click', function() {
+
+                    // 移除其他图片的选中状态
+
+                    document.querySelectorAll('.thumbnails img').forEach(img => img.classList.remove('selected'));
+
+                    img.classList.add('selected'); // 设置当前图片为选中状态
+
+
+
+                    // 显示调整后的图片在预览窗口
+
+                    adjustAndPreviewImage(file);
+
+                });
+
+
+
+                thumbnailsContainer.appendChild(img);
+
+            };
+
+
+
+            reader.readAsDataURL(file);
+
+        });
+
     });
 
     function adjustAndPreviewImage(file) {
@@ -1357,7 +1460,7 @@
       document.body.removeChild(pre);
 
       if (success) {
-        alert("✅ 已复制！颜色、换行、缩进已保留。");
+        alert("✅ 已复制！颜色已保留。");
       } else {
         alert("⚠️ 请手动复制预览区内容。");
       }
