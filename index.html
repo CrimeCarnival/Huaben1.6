@@ -142,6 +142,30 @@
         .role-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f3f4f6; }
         .btn-apply { background: var(--primary); width: auto; padding: 6px 12px; font-size: 12px; }
         .btn-merge { background: #8b5cf6; width: auto; padding: 6px 12px; font-size: 12px; }
+
+        /* 新增：AI链接按钮样式 */
+        .ai-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            padding: 8px 16px;
+            background-color: #fff;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .ai-link:hover {
+            background-color: var(--primary);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -231,7 +255,7 @@
 
             <div class="preview-section">
                 <div class="preview-container">
-                    <!-- 新增：预览区域顶部导航栏 -->
+                    <!-- 预览区域顶部导航栏 -->
                     <div class="preview-header">
                         <button class="nav-btn" id="prevBtn" disabled>◀ 上一张</button>
                         <h3 style="margin:0; color:var(--text-muted); font-size:14px;">效果预览</h3>
@@ -254,7 +278,11 @@
         <div class="tool-card hb-container">
             <div style="text-align: center; margin-bottom: 10px;">
                 <h2>🎨 有声书智能画本</h2>
-                <p style="color: var(--text-muted);">粘贴剧本，AI 自动识别角色并分色。</p>
+                <p style="color: var(--text-muted);">建议将文本后加提示词#分析文本，将角色台词前用【**：】标注。#  #用有声演播的方法，将每段句子后标注（情绪）#，发AI生成后粘贴文本</p>
+                <!-- 新增：AI链接按钮 -->
+                <a href="https://chat.qwen.ai" target="_blank" class="ai-link">
+                    🤖 打开通义千问 (Qwen AI) 辅助创作
+                </a>
             </div>
             <textarea class="hb-textarea" id="input" placeholder="在此粘贴剧本内容..."></textarea>
             <div class="hb-controls">
