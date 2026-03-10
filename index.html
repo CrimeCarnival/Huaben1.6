@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crous 工具集 - 智能版</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <style>
         :root {
             --primary: #10b981;
@@ -166,6 +171,34 @@
             transform: translateY(-1px);
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
+
+        /* 书库管理样式 */
+        .library-container { height: 70vh; display: flex; overflow: hidden; }
+        .library-sidebar { width: 260px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); border-right: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        .library-main { flex: 1; overflow-y: auto; background: #f9fafb; }
+        .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1.5rem; padding: 2rem; }
+        
+        #viewer-main { position: fixed; inset: 0; background: white; z-index: 1000; display: none; flex-direction: column; }
+        .slide-panel { position: absolute; top: 56px; width: 320px; height: calc(100% - 56px); background: white; box-shadow: 15px 0 30px rgba(0,0,0,0.1); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1100; overflow-y: auto; }
+        #toc-panel { left: -320px; border-right: 1px solid #eee; }
+        #toc-panel.active { left: 0; }
+        #settings-panel { right: -320px; border-left: 1px solid #eee; }
+        #settings-panel.active { right: 0; }
+
+        #render-area { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; transition: background 0.3s; }
+        #epub-viewer { width: 100%; height: 100%; }
+        
+        .book-card img { aspect-ratio: 3/4.2; object-fit: cover; border-radius: 12px; transition: all 0.3s; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .book-card:hover img { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0,0,0,0.15); }
+        
+        .theme-btn { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #ddd; transition: all 0.2s; position: relative; cursor: pointer; }
+        .theme-btn.active { border-color: #2563eb; transform: scale(1.1); }
+        .theme-btn.active::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #2563eb; font-weight: bold; }
+
+        .toc-link { display: block; padding: 14px 24px; font-size: 13px; color: #555; border-bottom: 1px solid #f9f9f9; cursor: pointer; }
+        .toc-link:hover { background: #f0f7ff; color: #2563eb; }
+        
+        #pdf-viewer canvas { box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 85vh; width: auto !important; }
     </style>
 </head>
 <body>
@@ -176,6 +209,7 @@
     <div class="tabs">
         <button class="tab-button active" data-tab="crousimg">像素工坊</button>
         <button class="tab-button" data-tab="hb16">智能画本</button>
+        <button class="tab-button" data-tab="library">书库管理</button>
     </div>
     
     <div id="crousimg" class="tab-content active">
@@ -293,6 +327,99 @@
             </div>
             <div id="output"></div>
             <div class="role-legend" id="legend"><div id="roleList"></div></div>
+        </div>
+    </div>
+
+    <!-- 书库管理标签页 -->
+    <div id="library" class="tab-content">
+        <div class="library-container">
+            <aside class="library-sidebar">
+                <div class="p-8">
+                    <h1 id="libName" onclick="handleRename()" class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent cursor-pointer">我的书库</h1>
+                    <p class="text-[9px] text-gray-400 mt-1 uppercase font-bold tracking-widest italic">Somnia Pro Library</p>
+                </div>
+                <nav class="flex-1 px-4 space-y-1">
+                    <button onclick="renderGrid('all')" class="w-full flex items-center px-4 py-3 text-sm font-semibold rounded-2xl text-gray-500 hover:bg-white hover:text-blue-600 transition">
+                        <i class="fas fa-layer-group w-8"></i> 全部藏书
+                    </button>
+                    <a href="https://z-lib.fm/" target="_blank" class="w-full flex items-center px-4 py-3 text-sm font-semibold rounded-2xl text-gray-500 hover:bg-white transition italic"><i class="fas fa-globe w-8 text-blue-400"></i>Z-Library</a>
+                    <div id="dirList" class="mt-4 space-y-1"></div>
+                </nav>
+                <div class="p-4 border-t border-gray-100">
+                    <button onclick="startScan()" class="w-full py-3 bg-blue-600 text-white rounded-2xl text-xs font-bold shadow-lg hover:bg-blue-700 transition">扫描文件夹</button>
+                    <button id="relinkBtn" onclick="relink()" class="hidden w-full py-3 mt-2 bg-green-50 text-green-600 border border-green-200 rounded-2xl text-xs font-bold transition">恢复连接</button>
+                </div>
+            </aside>
+
+            <main class="library-main">
+                <header class="h-16 px-8 flex items-center justify-between sticky top-0 bg-gray-50/80 backdrop-blur-md z-10">
+                    <h2 id="currentCategory" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Books Sorted by Progress</h2>
+                    <button onclick="clearCache()" class="text-[10px] font-bold text-red-300">重置所有缓存</button>
+                </header>
+                <div id="libraryGrid" class="library-grid"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 书库阅读器主界面 -->
+    <div id="viewer-main">
+        <div class="h-14 px-6 flex items-center justify-between border-b border-gray-100 bg-white z-20 shadow-sm">
+            <div class="flex items-center space-x-2">
+                <button onclick="closeViewer()" class="p-2 hover:bg-gray-100 rounded-xl transition"><i class="fas fa-arrow-left text-gray-400"></i></button>
+                <button onclick="togglePanel('toc-panel')" class="p-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold transition"><i class="fas fa-list-ul"></i> 目录</button>
+                <button onclick="togglePanel('settings-panel')" class="p-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold transition"><i class="fas fa-cog"></i> 设置</button>
+            </div>
+            <div id="readerTitle" class="text-xs font-bold text-gray-400 truncate max-w-sm italic">加载中...</div>
+            <div class="flex items-center space-x-3">
+                <button onclick="doPrev()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-left"></i></button>
+                <span id="progTag" class="text-[10px] font-bold bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full min-w-[70px] text-center">0%</span>
+                <button onclick="doNext()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+        
+        <div id="toc-panel" class="slide-panel"></div>
+
+        <div id="settings-panel" class="slide-panel">
+            <div class="p-6 space-y-8">
+                <div>
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 italic">Display Layout (PDF/EPUB)</h4>
+                    <div class="flex bg-gray-100 p-1 rounded-xl">
+                        <button id="mode-single" onclick="updateMode('single')" class="flex-1 py-2 text-xs rounded-lg transition">单页模式</button>
+                        <button id="mode-double" onclick="updateMode('double')" class="flex-1 py-2 text-xs rounded-lg transition">双页并排</button>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 italic">Interactive Toggles</h4>
+                    <div class="space-y-4">
+                        <label class="flex items-center justify-between text-xs text-gray-600">点击两侧翻页 <input type="checkbox" id="check-click" onchange="updateSettings()"></label>
+                        <label class="flex items-center justify-between text-xs text-gray-600">鼠标滚轮翻页 <input type="checkbox" id="check-wheel" onchange="updateSettings()"></label>
+                        <label class="flex items-center justify-between text-xs text-gray-600">键盘方向键翻页 <input type="checkbox" id="check-keys" onchange="updateSettings()"></label>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 italic">Background Theme</h4>
+                    <div class="flex justify-between px-1">
+                        <button onclick="setTheme('default')" id="t-default" class="theme-btn bg-white" title="默认"></button>
+                        <button onclick="setTheme('almond')" id="t-almond" class="theme-btn" style="background: rgb(250, 249, 222);" title="杏仁黄"></button>
+                        <button onclick="setTheme('green')" id="t-green" class="theme-btn" style="background: rgb(204, 232, 207);" title="暗夜绿"></button>
+                        <button onclick="setTheme('gray')" id="t-gray" class="theme-btn" style="background: rgb(234, 234, 239);" title="极光灰"></button>
+                        <button onclick="setTheme('night')" id="t-night" class="theme-btn bg-gray-900" title="夜间"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="render-area" onclick="handleReaderClick(event)">
+            <div id="epub-viewer"></div>
+            <div id="pdf-viewer" class="hidden overflow-auto h-full w-full flex flex-col items-center"></div>
+        </div>
+    </div>
+
+    <!-- 扫描覆盖层 -->
+    <div id="scanOverlay" class="fixed inset-0 bg-white/95 backdrop-blur-xl z-[2000] hidden flex items-center justify-center">
+        <div class="w-64 text-center">
+            <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-4"><div id="scanBar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div></div>
+            <p id="scanText" class="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Syncing Library...</p>
         </div>
     </div>
 </div>
@@ -638,6 +765,326 @@
     window.manualHighlight=function(){const r=document.getElementById("roleInput").value.trim();if(!r)return alert("输入角色名");const s=window.getSelection();if(!s.rangeCount)return alert("选中文本");const rg=s.getRangeAt(0);const t=rg.toString();if(!t)return;const sp=document.createElement("span");sp.style.color=getRoleColor(r);sp.textContent=t;rg.deleteContents();rg.insertNode(sp);updateLegend()}
     window.copyResult=function(){const r=document.createRange();r.selectNode(document.getElementById("output"));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");alert("已复制");window.getSelection().removeAllRanges()}
     updateLegend();
+
+    // ---------------- 书库管理逻辑 ----------------
+    let libDB, currentRendition, currentPDF, currentBook, rootHandle, currentBookBuffer;
+    let wheelBusy = false;
+
+    let libPrefs = JSON.parse(localStorage.getItem('SomniaPrefs')) || {
+        mode: 'double',
+        fontSize: 18,
+        theme: 'default',
+        controls: { click: true, wheel: true, keys: true }
+    };
+
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+    const dbReqLib = indexedDB.open("SomniaLib_Stable_v2", 2);
+    dbReqLib.onupgradeneeded = e => {
+        libDB = e.target.result;
+        if (!libDB.objectStoreNames.contains("books")) libDB.createObjectStore("books", { keyPath: "path" });
+        if (!libDB.objectStoreNames.contains("config")) libDB.createObjectStore("config", { keyPath: "id" });
+    };
+    dbReqLib.onsuccess = e => { libDB = e.target.result; initLibrary(); };
+
+    function initLibrary() {
+        document.getElementById('libName').innerText = localStorage.getItem('libName') || "我的书库";
+        syncLibrarySettingsDOM();
+        renderGrid();
+        checkHandle();
+    }
+
+    function syncLibrarySettingsDOM() {
+        document.getElementById('check-click').checked = libPrefs.controls.click;
+        document.getElementById('check-wheel').checked = libPrefs.controls.wheel;
+        document.getElementById('check-keys').checked = libPrefs.controls.keys;
+        updateModeBtnUI();
+        setTheme(libPrefs.theme);
+    }
+
+    function updateSettings() {
+        libPrefs.controls.click = document.getElementById('check-click').checked;
+        libPrefs.controls.wheel = document.getElementById('check-wheel').checked;
+        libPrefs.controls.keys = document.getElementById('check-keys').checked;
+        saveLibPrefs();
+    }
+
+    function saveLibPrefs() { localStorage.setItem('SomniaPrefs', JSON.stringify(libPrefs)); }
+
+    function handleReaderClick(e) {
+        if (!libPrefs.controls.click) return;
+        if (document.querySelector('.slide-panel.active')) { togglePanel(null); return; }
+        const x = e.clientX, w = window.innerWidth;
+        if (x < w * 0.3) doPrev(); else if (x > w * 0.7) doNext();
+    }
+
+    function doNext() {
+        if (currentPDF) {
+            let step = (libPrefs.mode === 'double' && currentBook.lastPage > 1) ? 2 : 1;
+            if (currentBook.lastPage + step <= currentPDF.numPages) {
+                currentBook.lastPage += step;
+                renderPDF(currentBook.lastPage);
+            }
+        } else currentRendition?.next();
+    }
+
+    function doPrev() {
+        if (currentPDF) {
+            let step = (libPrefs.mode === 'double' && currentBook.lastPage > 2) ? 2 : 1;
+            if (currentBook.lastPage - step >= 1) {
+                currentBook.lastPage -= step;
+                renderPDF(currentBook.lastPage);
+            }
+        } else currentRendition?.prev();
+    }
+
+    window.onwheel = e => {
+        if (!libPrefs.controls.wheel || document.getElementById('viewer-main').style.display !== 'flex' || wheelBusy) return;
+        wheelBusy = true;
+        if (e.deltaY > 0) doNext(); else doPrev();
+        setTimeout(() => { wheelBusy = false; }, 500);
+    };
+
+    window.onkeydown = e => {
+        if (!libPrefs.controls.keys || document.getElementById('viewer-main').style.display === 'none') return;
+        if (e.key === 'ArrowRight' || e.key === ' ') doNext();
+        if (e.key === 'ArrowLeft') doPrev();
+        if (e.key === 'Escape') closeViewer();
+    };
+
+    async function renderPDF(num) {
+        const viewer = document.getElementById('pdf-viewer');
+        viewer.innerHTML = '';
+        
+        const isDouble = libPrefs.mode === 'double' && num > 1;
+        const scale = window.innerWidth < 1024 ? (isDouble ? 0.6 : 0.9) : (isDouble ? 1.0 : 1.5);
+
+        const container = document.createElement('div');
+        container.className = isDouble ? "flex gap-8 justify-center items-start p-4" : "flex justify-center p-4";
+        viewer.appendChild(container);
+
+        await renderSinglePDFPage(num, container, scale);
+
+        if (isDouble && num + 1 <= currentPDF.numPages) {
+            await renderSinglePDFPage(num + 1, container, scale);
+        }
+
+        const displayPage = isDouble ? `${num}-${Math.min(num+1, currentPDF.numPages)}` : num;
+        document.getElementById('progTag').innerText = `${displayPage} / ${currentPDF.numPages}`;
+        updateProgress((num/currentPDF.numPages)*100, {lastPage: num});
+    }
+
+    async function renderSinglePDFPage(pageNum, parent, scale) {
+        const page = await currentPDF.getPage(pageNum);
+        const canvas = document.createElement('canvas');
+        canvas.className = "shadow-2xl my-4 bg-white transition-opacity duration-500 opacity-0";
+        const ctx = canvas.getContext('2d');
+        const viewport = page.getViewport({scale});
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        parent.appendChild(canvas);
+        await page.render({canvasContext: ctx, viewport}).promise;
+        canvas.style.opacity = "1";
+    }
+
+    async function initEpub(data, cfi) {
+        const viewer = document.getElementById('epub-viewer');
+        viewer.innerHTML = '';
+        const book = ePub(data);
+        await book.opened;
+        
+        const toc = await book.navigation.toc;
+        const panel = document.getElementById('toc-panel');
+        panel.innerHTML = '<div class="p-6 font-bold text-gray-300 uppercase tracking-widest text-[10px] bg-gray-50/50">Table of Contents</div>';
+        const renderToc = (items) => {
+            items.forEach(t => {
+                const a = document.createElement('div'); a.className = 'toc-link'; a.innerText = t.label;
+                a.onclick = (ev) => { ev.stopPropagation(); currentRendition.display(t.href); togglePanel(null); };
+                panel.appendChild(a);
+                if(t.subitems) renderToc(t.subitems);
+            });
+        };
+        renderToc(toc);
+
+        currentRendition = book.renderTo("epub-viewer", {
+            width: "100%", height: "100%", flow: "paginated", manager: "default",
+            spread: libPrefs.mode === 'double' ? 'always' : 'none', allowScriptedContent: true
+        });
+
+        currentRendition.on('rendered', (section, view) => {
+            const doc = view.document;
+            doc.addEventListener('click', e => handleReaderClick(e));
+            doc.addEventListener('keydown', e => {
+                if(!libPrefs.controls.keys) return;
+                if(e.key === 'ArrowRight' || e.key === ' ') doNext();
+                if(e.key === 'ArrowLeft') doPrev();
+            });
+        });
+
+        currentRendition.on("relocated", loc => {
+            const p = (book.locations.percentageFromCfi(loc.start.cfi) * 100).toFixed(1);
+            document.getElementById('progTag').innerText = p + '%';
+            updateProgress(parseFloat(p), {cfi: loc.start.cfi});
+        });
+
+        book.locations.generate(1000);
+        await book.ready;
+        try { await currentRendition.display(cfi || undefined); } catch(e) { await currentRendition.display(); }
+        applyEPUBPrefs();
+        setTimeout(() => currentRendition.resize(), 500);
+    }
+
+    function setTheme(t) {
+        libPrefs.theme = t;
+        const themes = {
+            default: { bg: '#ffffff', text: '#1d1d1f' },
+            almond: { bg: 'rgb(250, 249, 222)', text: '#3e392d' },
+            green: { bg: 'rgb(204, 232, 207)', text: '#2e3a2e' },
+            gray: { bg: 'rgb(234, 234, 239)', text: '#2d2d3a' },
+            night: { bg: 'rgb(30, 30, 35)', text: '#d1d1d6' }
+        };
+        const active = themes[t];
+        document.getElementById('render-area').style.backgroundColor = active.bg;
+        document.getElementById('pdf-viewer').style.backgroundColor = active.bg;
+        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('t-' + t).classList.add('active');
+        if(currentRendition) applyEPUBPrefs();
+        saveLibPrefs();
+    }
+
+    function applyEPUBPrefs() {
+        if(!currentRendition) return;
+        const theme = {
+            default: { bg: '#ffffff', text: '#1d1d1f' },
+            almond: { bg: 'rgb(250, 249, 222)', text: '#3e392d' },
+            green: { bg: 'rgb(204, 232, 207)', text: '#2e3a2e' },
+            gray: { bg: 'rgb(234, 234, 239)', text: '#2d2d3a' },
+            night: { bg: 'rgb(30, 30, 35)', text: '#d1d1d6' }
+        }[libPrefs.theme];
+        currentRendition.themes.register('custom', { body: { color: theme.text + ' !important', background: theme.bg + ' !important' }});
+        currentRendition.themes.select('custom');
+    }
+
+    function updateMode(m) {
+        libPrefs.mode = m; updateModeBtnUI(); saveLibPrefs();
+        if(currentBook.type === 'PDF') renderPDF(currentBook.lastPage);
+        else initEpub(currentBookBuffer, currentRendition?.location?.start?.cfi);
+    }
+
+    function updateModeBtnUI() {
+        const isD = libPrefs.mode === 'double';
+        document.getElementById('mode-double').className = isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400';
+        document.getElementById('mode-single').className = !isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400';
+    }
+
+    async function openReader(book) {
+        currentBook = book;
+        document.getElementById('viewer-main').style.display = 'flex';
+        document.getElementById('readerTitle').innerText = book.title;
+        if(await book.handle.queryPermission({mode:'read'}) !== 'granted') await book.handle.requestPermission({mode:'read'});
+        const file = await book.handle.getFile();
+        currentBookBuffer = await file.arrayBuffer();
+        if(book.type === 'PDF') {
+            document.getElementById('pdf-viewer').classList.remove('hidden');
+            document.getElementById('epub-viewer').classList.add('hidden');
+            currentRendition = null; currentPDF = await pdfjsLib.getDocument(currentBookBuffer).promise;
+            renderPDF(book.lastPage || 1);
+        } else {
+            document.getElementById('epub-viewer').classList.remove('hidden');
+            document.getElementById('pdf-viewer').classList.add('hidden');
+            currentPDF = null; initEpub(currentBookBuffer, book.cfi);
+        }
+    }
+
+    function renderGrid(filter = 'all') {
+        if (!libDB) return;
+        const grid = document.getElementById('libraryGrid'); grid.innerHTML = '';
+        const dirs = new Set(); const all = [];
+        const tx = libDB.transaction("books", "readonly");
+        tx.objectStore("books").openCursor().onsuccess = e => {
+            const c = e.target.result;
+            if(c) { all.push(c.value); c.continue(); }
+            else {
+                all.sort((a,b) => (b.progress||0) - (a.progress||0)).forEach(b => {
+                    dirs.add(b.folder);
+                    if(filter === 'all' || b.folder === filter) {
+                        const isDone = b.progress >= 99.5;
+                        const div = document.createElement('div'); div.className = "book-card flex flex-col cursor-pointer";
+                        div.onclick = () => openReader(b);
+                        div.innerHTML = `<div class="relative mb-3"><img src="${b.cover||''}" class="w-full shadow-md"><div class="absolute bottom-2 right-2 ${isDone?'bg-green-500':'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-lg">${isDone?'已阅读':(b.progress||0).toFixed(0)+'%'}</div></div><h3 class="text-[11px] font-bold text-gray-700 line-clamp-2 px-1 leading-tight">${b.title}</h3>`;
+                        grid.appendChild(div);
+                    }
+                });
+                document.getElementById('dirList').innerHTML = Array.from(dirs).map(d => `<button onclick="renderGrid('${d}')" class="w-full text-left px-4 py-3 text-[10px] text-gray-400 hover:text-blue-600 font-bold uppercase truncate transition"><i class="fas fa-folder mr-3 opacity-20"></i>${d}</button>`).join('');
+            }
+        }
+    }
+
+    function togglePanel(id) { ['toc-panel', 'settings-panel'].forEach(p => { if(p === id) document.getElementById(p).classList.toggle('active'); else document.getElementById(p).classList.remove('active'); }); }
+    function closeViewer() { document.getElementById('viewer-main').style.display = 'none'; renderGrid(); }
+    async function checkHandle() { libDB.transaction("config", "readonly").objectStore("config").get("root").onsuccess = e => { if(e.target.result) { rootHandle = e.target.result.handle; document.getElementById('relinkBtn')?.classList.remove('hidden'); } }; }
+    async function relink() { if(await rootHandle.requestPermission({mode:'read'}) === 'granted') { document.getElementById('relinkBtn').classList.add('hidden'); renderGrid(); } }
+    async function startScan() {
+        rootHandle = await window.showDirectoryPicker();
+        libDB.transaction("config", "readwrite").objectStore("config").put({id: "root", handle: rootHandle});
+        document.getElementById('scanOverlay').classList.remove('hidden');
+        let files = [];
+        async function walk(h, p) {
+            for await (const e of h.values()) {
+                const rel = p ? `${p}/${e.name}` : e.name;
+                if(e.kind === 'file' && ['pdf','epub'].includes(e.name.split('.').pop().toLowerCase())) files.push({h: e, p: rel});
+                else if(e.kind === 'directory') await walk(e, rel);
+            }
+        }
+        await walk(rootHandle, "");
+        for(let i=0; i<files.length; i++){
+            document.getElementById('scanBar').style.width = ((i+1)/files.length)*100 + '%';
+            await saveBook(files[i].h, files[i].p);
+        }
+        document.getElementById('scanOverlay').classList.add('hidden');
+        renderGrid();
+    }
+    async function saveBook(handle, path) {
+        const tx = libDB.transaction("books", "readwrite");
+        const existing = await new Promise(r => { tx.objectStore("books").get(path).onsuccess = e => r(e.target.result); });
+        if(existing && existing.cover) return;
+        const file = await handle.getFile();
+        const buffer = await file.arrayBuffer();
+        let cover = "";
+        try {
+            if(path.endsWith('.epub')) {
+                const book = ePub(buffer);
+                const url = await book.coverUrl();
+                const res = await fetch(url);
+                cover = await new Promise(r => { const reader = new FileReader(); reader.onloadend = () => r(reader.result); reader.readAsDataURL(res); });
+            } else {
+                const pdf = await pdfjsLib.getDocument(buffer).promise;
+                const page = await pdf.getPage(1);
+                const canvas = document.createElement('canvas');
+                const viewport = page.getViewport({scale: 0.3});
+                canvas.width = viewport.width; canvas.height = viewport.height;
+                await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+                cover = canvas.toDataURL("image/jpeg", 0.6);
+                pdf.destroy();
+            }
+        } catch(e) {}
+        const txWrite = libDB.transaction("books", "readwrite");
+        txWrite.objectStore("books").put({
+            title: handle.name, path, handle, cover, progress: existing ? existing.progress : 0, lastPage: existing ? existing.lastPage : 1,
+            type: path.endsWith('.pdf') ? 'PDF' : 'EPUB', folder: path.includes('/') ? path.split('/')[0] : '根目录'
+        });
+    }
+    function updateProgress(p, ex) {
+        const tx = libDB.transaction("books", "readwrite");
+        const store = tx.objectStore("books");
+        store.get(currentBook.path).onsuccess = e => {
+            const b = e.target.result;
+            if(b) { b.progress = p; Object.assign(b, ex); store.put(b); }
+        }
+    }
+    function clearCache() { if(confirm("重置数据？")){ indexedDB.deleteDatabase("SomniaLib_Stable_v2"); location.reload(); }}
+    function handleRename() { const n = prompt("重命名书库:", document.getElementById('libName').innerText); if(n) { document.getElementById('libName').innerText = n; localStorage.setItem('libName', n); } }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
