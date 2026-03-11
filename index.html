@@ -31,9 +31,29 @@
         #notes-panel { right: -300px; border-left: 1px solid #eee; }
         #notes-panel.active { right: 0; }
 
-        #render-area { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; }
-        #epub-viewer, #pdf-viewer { width: 100%; height: 100%; }
-        #txt-viewer, #md-viewer { width: 100%; height: 100%; padding: 40px 10%; overflow-y: auto; line-height: 1.8; font-size: 18px; white-space: pre-wrap; display: none; word-break: break-all; }
+        /* ---------------- 核心排版与页边距修复 ---------------- */
+        #render-area { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; box-sizing: border-box; }
+        
+        /* 强制给 EPUB 和 PDF 容器底部增加内边距，确保文字绝对不遮挡阅读进度 */
+        #epub-viewer { width: 100%; height: 100%; padding-bottom: 50px; box-sizing: border-box; }
+        #pdf-viewer { width: 100%; height: 100%; padding-bottom: 80px; box-sizing: border-box; }
+
+        /* TXT与MD的排版：左右大边距(版心设计)，底部加大防遮挡留白 */
+        #txt-viewer, #md-viewer { 
+            width: 100%; height: 100%; 
+            padding: 100px 25% 120px; /* PC端：顶部100px，左右25%，底部留白120px */
+            overflow-y: auto; 
+            line-height: 1.8; 
+            font-size: 18px; 
+            white-space: pre-wrap; 
+            display: none; 
+            word-break: break-all; 
+            box-sizing: border-box; /* 核心修复点 */
+        }
+        @media (max-width: 768px) { 
+            #txt-viewer, #md-viewer { padding: 40px 6vw 100px; /* 移动端边距适度缩小 */ } 
+        }
+
         #md-viewer { white-space: normal; }
         #md-viewer h1 { font-size: 2em; font-weight: bold; margin-bottom: 1em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
         #md-viewer blockquote { border-left: 4px solid #3b82f6; padding-left: 1em; color: #666; background: #f8fafc; padding: 10px; border-radius: 4px; }
@@ -332,11 +352,12 @@
             <div id="readerTitle" class="text-xs font-bold text-gray-400 truncate max-w-sm italic ml-4">书名</div>
             <div class="flex items-center space-x-3 ml-auto">
                 <button onclick="doPrev()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-left"></i></button>
-                <span id="progTag" class="text-[10px] font-bold bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full min-w-[70px] text-center italic">0%</span>
                 <button onclick="doNext()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-right"></i></button>
             </div>
         </div>
         
+        <div id="progTag" class="absolute bottom-3 left-1/2 transform -translate-x-1/2 text-[10px] text-gray-400 font-medium tracking-widest z-30 pointer-events-none drop-shadow-sm">0%</div>
+
         <div class="flip-zone flip-left" onclick="handleFlipZoneClick('prev')"><i class="fas fa-chevron-left"></i></div>
         <div class="flip-zone flip-right" onclick="handleFlipZoneClick('next')"><i class="fas fa-chevron-right"></i></div>
 
@@ -368,6 +389,9 @@
                 <div class="flex items-center justify-between mb-2"><button onclick="changeFontSize(-2)" class="w-8 h-8 bg-gray-100 rounded-lg"><i class="fas fa-minus text-[10px]"></i></button><span id="fontLabel" class="text-xs font-bold">18px</span><button onclick="changeFontSize(2)" class="w-8 h-8 bg-gray-100 rounded-lg"><i class="fas fa-plus text-[10px]"></i></button></div>
                 <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-400">字间距</span><span id="spacingLabel" class="text-[10px] font-bold">0px</span></div>
                 <input type="range" id="spacingSlider" min="0" max="10" step="1" value="0" oninput="updateLetterSpacing(this.value)" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                
+                <div class="flex justify-between mb-2 mt-4"><span class="text-[10px] text-gray-400">行间距</span><span id="lineHeightLabel" class="text-[10px] font-bold">1.8</span></div>
+                <input type="range" id="lineHeightSlider" min="1.0" max="3.0" step="0.1" value="1.8" oninput="updateLineHeight(this.value)" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
             </div>
             <div>
                 <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">背景色 (强制覆盖)</h4>
@@ -429,7 +453,6 @@
     </div>
 
     <script>
-        // --- 新增：移动端侧边栏切换逻辑 ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('mobileOverlay');
@@ -437,7 +460,6 @@
             overlay.classList.toggle('hidden');
         }
 
-        // --- 修改：视图切换时如果在移动端则自动收起侧边栏 ---
         function switchMainView(view) {
             document.getElementById('view-library').style.display = 'none';
             document.getElementById('view-crousimg').style.display = 'none';
@@ -463,7 +485,6 @@
                 document.getElementById('currentCategory').innerText = "Crous - 智能画本";
             }
 
-            // 移动端自动收起侧边栏
             if (window.innerWidth < 768) {
                 document.getElementById('sidebar').classList.add('-translate-x-full');
                 document.getElementById('mobileOverlay').classList.add('hidden');
@@ -473,13 +494,12 @@
         let db, currentRendition, currentPDF, currentBook, rootHandle, currentBookBuffer;
         let wheelBusy = false, globalTags = new Set();
         let tempEpubSelection = null;
-        // --- 新增：移动端触摸滑动翻页核心逻辑 ---
+
         let touchStartX = 0;
         let touchStartY = 0;
-        const SWIPE_THRESHOLD = 50; // 触发滑动的最小滑动距离(像素)
+        const SWIPE_THRESHOLD = 50; 
 
         function handleTouchStart(e) {
-            // 忽略多指触控（防止缩放操作误触）
             if (e.touches.length > 1) return; 
             touchStartX = e.changedTouches[0].screenX;
             touchStartY = e.changedTouches[0].screenY;
@@ -494,25 +514,17 @@
             const diffX = touchEndX - touchStartX;
             const diffY = touchEndY - touchStartY;
 
-            // 判断是否为水平滑动（X轴位移大于Y轴位移，且超过阈值）
             if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > SWIPE_THRESHOLD) {
-                // 如果侧边栏处于打开状态，不触发翻页
                 if (document.querySelector('.slide-panel.active')) return; 
-
-                if (diffX > 0) {
-                    doPrev(); // 向右滑，上一页
-                } else {
-                    doNext(); // 向左滑，下一页
-                }
+                if (diffX > 0) doPrev(); else doNext();
             }
         }
-        // ----------------------------------------
 
         const pdfjs = window['pdfjs-dist/build/pdf'];
         pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
         let prefs = JSON.parse(localStorage.getItem('SomniaPrefs_v34')) || {
-            mode: 'double', fontSize: 18, letterSpacing: 0, isNight: false, pdfScale: 'auto', theme: 'default',
+            mode: 'double', fontSize: 18, letterSpacing: 0, lineHeight: 1.8, isNight: false, pdfScale: 'auto', theme: 'default',
             controls: { click: true, wheel: true, keys: true }
         };
 
@@ -529,7 +541,6 @@
             switchMainView('library');
             checkHandle(); setTimeout(syncSettingsDOM, 300);
 
-            // --- 新增：为主渲染区绑定滑动事件 ---
             const renderArea = document.getElementById('render-area');
             renderArea.addEventListener('touchstart', handleTouchStart, { passive: true });
             renderArea.addEventListener('touchend', handleTouchEnd, { passive: true });
@@ -618,7 +629,6 @@
                 flipZones.forEach(z => z.style.display = 'flex');
             }
 
-            // 移动端点开书籍时自动收起侧边栏
             if (window.innerWidth < 768) {
                 document.getElementById('sidebar').classList.add('-translate-x-full');
                 document.getElementById('mobileOverlay').classList.add('hidden');
@@ -731,10 +741,38 @@
             const themes = { default:{bg:'#ffffff', text:'#1d1d1f'}, almond:{bg:'rgb(250, 249, 222)', text:'#3e392d'}, green:{bg:'rgb(204, 232, 207)', text:'#2e3a2e'}, gray:{bg:'rgb(234, 234, 239)', text:'#2d2d3a'} };
             const active = themes[prefs.theme] || themes['default'];
             const bg = prefs.isNight ? '#1a1a1a' : active.bg; const text = prefs.isNight ? '#d1d1d6' : active.text;
+            const lh = prefs.lineHeight || 1.8; 
+            
             document.getElementById('render-area').style.backgroundColor = bg;
-            ['txt-viewer', 'md-viewer'].forEach(id => { const tv = document.getElementById(id); if(tv) { tv.style.backgroundColor = bg; tv.style.color = text; tv.style.fontSize = prefs.fontSize + 'px'; tv.style.letterSpacing = prefs.letterSpacing + 'px'; } });
+            ['txt-viewer', 'md-viewer'].forEach(id => { 
+                const tv = document.getElementById(id); 
+                if(tv) { 
+                    tv.style.backgroundColor = bg; 
+                    tv.style.color = text; 
+                    tv.style.fontSize = prefs.fontSize + 'px'; 
+                    tv.style.letterSpacing = prefs.letterSpacing + 'px'; 
+                    tv.style.lineHeight = lh; 
+                } 
+            });
             document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active')); const b = document.getElementById('t-'+prefs.theme); if(b) b.classList.add('active');
-            if(currentRendition) { const themeName = 'custom-' + Date.now(); currentRendition.themes.register(themeName, { "body": { "background": bg + " !important", "color": text + " !important", "font-size": prefs.fontSize + "px !important", "letter-spacing": prefs.letterSpacing + "px !important" } }); currentRendition.themes.select(themeName); }
+            
+            // EPUB 主题注入：增加行间距和底部内边距防遮挡
+            // EPUB 页边距设置
+            if(currentRendition) { 
+                const themeName = 'custom-' + Date.now(); 
+                const isMobile = window.innerWidth < 768;
+                currentRendition.themes.register(themeName, { 
+                    "body": { 
+                        "background": bg + " !important", 
+                        "color": text + " !important", 
+                        "font-size": prefs.fontSize + "px !important", 
+                        "letter-spacing": prefs.letterSpacing + "px !important",
+                        "line-height": lh + " !important", 
+                        "padding": isMobile ? "20px 5% !important" : "40px 10% !important" 
+                    } 
+                }); 
+                currentRendition.themes.select(themeName); 
+            }
         }
 
         function setTheme(t) { prefs.theme = t; savePrefs(); applyThemeStyles(); }
@@ -742,6 +780,13 @@
         function updateNightIcon() { document.querySelector('#nightToggle i').className = prefs.isNight ? 'fas fa-sun' : 'fas fa-moon'; }
         function changeFontSize(d) { prefs.fontSize = Math.min(60, Math.max(12, prefs.fontSize+d)); document.getElementById('fontLabel').innerText = prefs.fontSize+'px'; applyThemeStyles(); savePrefs(); }
         function updateLetterSpacing(val) { prefs.letterSpacing = val; document.getElementById('spacingLabel').innerText = val+'px'; applyThemeStyles(); savePrefs(); }
+        
+        window.updateLineHeight = (val) => { 
+            prefs.lineHeight = parseFloat(val); 
+            document.getElementById('lineHeightLabel').innerText = val; 
+            applyThemeStyles(); 
+            savePrefs(); 
+        };
 
         async function initEpub(data, cfi) {
             const viewer = document.getElementById('epub-viewer'); viewer.innerHTML = '';
@@ -756,10 +801,17 @@
                 view.document.addEventListener('click', (e) => { const sel = view.document.getSelection(); if(sel && sel.toString().trim().length > 0) return; handleAreaClick(); hideHighlightTriggers(); }); 
                 view.document.addEventListener('contextmenu', e => { const sel = view.document.getSelection(); if(sel && sel.toString().trim().length > 0 && tempEpubSelection) { e.preventDefault(); executeHighlight(); } });
                 
-                // --- 新增：为 EPUB 内部绑定滑动事件 ---
                 view.document.addEventListener('touchstart', handleTouchStart, { passive: true });
                 view.document.addEventListener('touchend', handleTouchEnd, { passive: true });
-                // -------------------------------------
+
+                // --- 核心修复：为 EPUB 内部注入滚轮事件监听 ---
+                view.document.addEventListener('wheel', e => {
+                    if (wheelBusy || !prefs.controls.wheel) return;
+                    if(Math.abs(e.deltaY) < 40) return;
+                    wheelBusy = true;
+                    if(e.deltaY > 0) doNext(); else doPrev();
+                    setTimeout(()=>wheelBusy=false, 500);
+                }, { passive: true });
             });
             currentRendition.on("relocated", loc => { const p = book.locations.percentageFromCfi(loc.start.cfi); const dp = (p && p > 0) ? (p * 100).toFixed(1) : (Number(currentBook.progress) || 0).toFixed(1); document.getElementById('progTag').innerText = dp + '%'; window.updateProgress(parseFloat(dp), {cfi: loc.start.cfi}); });
             (currentBook.notes || []).forEach(n => { if(n.type==='epub' || !n.type) currentRendition.annotations.add("highlight", n.loc || n.cfi, {}, (e)=>{}); });
@@ -773,7 +825,7 @@
             const v = document.getElementById('pdf-viewer'); v.innerHTML = ''; v.classList.remove('hidden');
             document.getElementById('epub-viewer').style.display = 'none'; document.getElementById('txt-viewer').style.display = 'none'; document.getElementById('md-viewer').style.display = 'none';
             const isD = prefs.mode === 'double' && num > 1;
-            const container = document.createElement('div'); container.className = isD ? "flex gap-8 justify-center p-4 relative" : "flex justify-center p-4 relative"; v.appendChild(container);
+            const container = document.createElement('div'); container.className = isD ? "flex gap-8 justify-center p-6 pb-24 relative" : "flex justify-center p-6 pb-24 relative"; v.appendChild(container);
             v.oncontextmenu = e => { e.preventDefault(); if(confirm(`要将 PDF 第 ${num} 页加入笔记书签吗？`)) { saveNote(`PDF-Page-${num}`, `🔖 PDF 书签 - 停留在第 ${num} 页`, 'pdf'); } };
             try {
                 const page = await currentPDF.getPage(num); const raw = page.getViewport({ scale: 1 });
@@ -786,11 +838,8 @@
 
         function initMd(buf) {
             const v = document.getElementById('md-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('txt-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
-            
             let text = new TextDecoder('utf-8').decode(buf); 
-            if(text.includes('\uFFFD')) {
-                text = new TextDecoder('gbk').decode(buf);
-            }
+            if(text.includes('\uFFFD')) text = new TextDecoder('gbk').decode(buf);
             
             v.innerHTML = marked.parse(text); v.scrollTop = 0; applyThemeStyles();
             setTimeout(() => { v.scrollTop = (currentBook.txtPos || 0) * v.scrollHeight; }, 100);
@@ -799,11 +848,8 @@
 
         function initTxt(buf) {
             const v = document.getElementById('txt-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('md-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
-            
             let text = new TextDecoder('utf-8').decode(buf); 
-            if(text.includes('\uFFFD')) {
-                text = new TextDecoder('gbk').decode(buf);
-            }
+            if(text.includes('\uFFFD')) text = new TextDecoder('gbk').decode(buf);
             
             v.innerText = text; v.scrollTop = 0; applyThemeStyles();
             setTimeout(() => { v.scrollTop = (currentBook.txtPos || 0) * v.scrollHeight; }, 100);
@@ -815,12 +861,11 @@
         async function startScan() { try { rootHandle = await window.showDirectoryPicker(); db.transaction("config","readwrite").objectStore("config").put({id:"root", handle:rootHandle}); document.getElementById('scanOverlay').classList.remove('hidden'); let files = []; async function walk(h, p) { for await (const e of h.values()) { const rel = p ? `${p}/${e.name}` : e.name; if(e.kind==='file' && ['pdf','epub','txt','md'].includes(e.name.split('.').pop().toLowerCase())) files.push({h:e, p:rel}); else if(e.kind==='directory') await walk(e, rel); } } await walk(rootHandle, ""); for(let i=0; i<files.length; i++){ document.getElementById('scanBar').style.width = ((i+1)/files.length*100)+'%'; await new Promise(r => setTimeout(r, 20)); try { await saveBook(files[i].h, files[i].p); } catch(err) { } } } catch(e) { } finally { document.getElementById('scanOverlay').classList.add('hidden'); renderGrid(); } }
         async function saveBook(h, p) { const txR = db.transaction("books","readonly"); const ex = await new Promise(r => { txR.objectStore("books").get(p).onsuccess=e=>r(e.target.result); }); let cover = ""; if (ex && ex.cover) { cover = ex.cover; } else { try { const file = await h.getFile(); const buf = await file.arrayBuffer(); cover = await extractCover(buf, p); } catch(e) { } } db.transaction("books","readwrite").objectStore("books").put({ title:h.name, path:p, handle:h, cover, progress:ex?Number(ex.progress):0, lastPage:ex?ex.lastPage:1, notes:ex?ex.notes:[], type:p.split('.').pop().toUpperCase(), folder:p.includes('/')?p.split('/')[0]:'根目录', tags:ex?ex.tags:[] }); }
         
-        // --- 修改：renderGrid 解决字体无法缩小及不显示缩略号的问题 ---
         function renderGrid(filter = 'all') { 
             if(!db) return; 
             const grid = document.getElementById('libraryGrid'); grid.innerHTML = ''; 
             const dirs = new Set(), tags = new Set(), all = []; 
-            const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase(); // 获取搜索词
+            const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase();
 
             db.transaction("books", "readonly").objectStore("books").openCursor().onsuccess = e => { 
                 const c = e.target.result; 
@@ -831,7 +876,6 @@
                     c.continue(); 
                 } else { 
                     all.sort((a,b) => (Number(b.progress)||0) - (Number(a.progress)||0)).forEach(b => { 
-                        
                         const matchSearch = b.title.toLowerCase().includes(searchQuery);
                         const matchFilter = (filter === 'all' || b.folder === filter || (b.tags && b.tags.includes(filter)));
 
@@ -843,7 +887,6 @@
                             
                             let cvHTML = b.cover ? `<img src="${b.cover}" class="w-full h-full object-cover">` : `<div class="no-cover-label">${b.title}</div>`; 
                             
-                            // 【最终修复】：直接使用 style="..." 写入原生 CSS，强行生效缩略和字体大小
                             div.innerHTML = `
                                 <div class="cover-box mb-2">
                                     ${cvHTML}
@@ -874,13 +917,25 @@
         
         function handleGlobalKey(e) { if(['INPUT','TEXTAREA'].includes(e.target.tagName)) return; if(e.ctrlKey && e.key.toLowerCase()==='e') { e.preventDefault(); exportIndexOnly(); return; } if(e.ctrlKey && e.key.toLowerCase()==='i') { e.preventDefault(); document.getElementById('importInput').click(); return; } if(!prefs.controls.keys) return; if(document.getElementById('viewer-main').style.display === 'flex'){ if(e.key === 'ArrowRight' || e.key === ' ') doNext(); if(e.key === 'ArrowLeft') doPrev(); if(e.key === 'Escape') closeViewer(); } }
         window.onkeydown = handleGlobalKey;
-        window.onwheel = e => { if (document.getElementById('viewer-main').style.display !== 'flex' || wheelBusy || !prefs.controls.wheel) return; if(Math.abs(e.deltaY) < 40) return; wheelBusy = true; if(e.deltaY > 0) doNext(); else doPrev(); setTimeout(()=>wheelBusy=false, 500); };
+        
+        // --- 核心修复：排除 TXT/MD 以恢复浏览器原生滚动条 ---
+        window.onwheel = e => { 
+            if (document.getElementById('viewer-main').style.display !== 'flex' || wheelBusy || !prefs.controls.wheel) return; 
+            if (currentBook && (currentBook.type === 'TXT' || currentBook.type === 'MD')) return;
+            
+            if(Math.abs(e.deltaY) < 40) return; 
+            wheelBusy = true; 
+            if(e.deltaY > 0) doNext(); else doPrev(); 
+            setTimeout(()=>wheelBusy=false, 500); 
+        };
+        
         function doNext() { const activeV = document.querySelector('#render-area > div:not(.hidden):not([style*="display: none"])'); if(activeV && !['epub-viewer', 'pdf-viewer'].includes(activeV.id)) { activeV.scrollTop += window.innerHeight * 0.7; return; } if(currentPDF) { let s = (prefs.mode==='double'&&currentBook.lastPage>1)?2:1; if(currentBook.lastPage+s<=currentPDF.numPages) renderPDF(currentBook.lastPage+=s); } else currentRendition?.next(); }
         function doPrev() { const activeV = document.querySelector('#render-area > div:not(.hidden):not([style*="display: none"])'); if(activeV && !['epub-viewer', 'pdf-viewer'].includes(activeV.id)) { activeV.scrollTop -= window.innerHeight * 0.7; return; } if(currentPDF) { let s = (prefs.mode==='double'&&currentBook.lastPage>2)?2:1; if(currentBook.lastPage-s>=1) renderPDF(currentBook.lastPage-=s); } else currentRendition?.prev(); }
         function handleAreaClick(e) { if(document.querySelector('.slide-panel.active')) togglePanel(null); hideHighlightTriggers(); }
         function handleFlipZoneClick(dir) { if(!prefs.controls.click || (currentBook && ['TXT', 'MD'].includes(currentBook.type))) return; togglePanel(null); if(dir === 'next') doNext(); else doPrev(); }
         
-        function syncSettingsDOM() { try { const get = id => document.getElementById(id); if(get('check-click')) get('check-click').checked = prefs.controls.click; if(get('check-wheel')) get('check-wheel').checked = prefs.controls.wheel; if(get('check-keys')) get('check-keys').checked = prefs.controls.keys; if(get('fontLabel')) get('fontLabel').innerText = prefs.fontSize + 'px'; if(get('spacingSlider')) get('spacingSlider').value = prefs.letterSpacing; if(get('spacingLabel')) get('spacingLabel').innerText = prefs.letterSpacing + 'px'; if(get('pdfSlider')) get('pdfSlider').value = (prefs.pdfScale === 'auto' ? 1 : prefs.pdfScale); updateModeBtnUI(); updateNightIcon(); applyThemeStyles(); } catch(e) {} }
+        function syncSettingsDOM() { try { const get = id => document.getElementById(id); if(get('check-click')) get('check-click').checked = prefs.controls.click; if(get('check-wheel')) get('check-wheel').checked = prefs.controls.wheel; if(get('check-keys')) get('check-keys').checked = prefs.controls.keys; if(get('fontLabel')) get('fontLabel').innerText = prefs.fontSize + 'px'; if(get('spacingSlider')) get('spacingSlider').value = prefs.letterSpacing; if(get('spacingLabel')) get('spacingLabel').innerText = prefs.letterSpacing + 'px'; if(get('pdfSlider')) get('pdfSlider').value = (prefs.pdfScale === 'auto' ? 1 : prefs.pdfScale); if(get('lineHeightSlider')) get('lineHeightSlider').value = prefs.lineHeight || 1.8; if(get('lineHeightLabel')) get('lineHeightLabel').innerText = prefs.lineHeight || 1.8; updateModeBtnUI(); updateNightIcon(); applyThemeStyles(); } catch(e) {} }
+        
         function updateModeBtnUI() { const isD = prefs.mode==='double'; document.getElementById('mode-double').className = isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400'; document.getElementById('mode-single').className = !isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400'; }
         function togglePanel(id) { ['toc-panel','settings-panel','notes-panel'].forEach(p=>{ const el = document.getElementById(p); if(p===id) el.classList.toggle('active'); else el.classList.remove('active'); }); }
         function closeViewer() { document.getElementById('viewer-main').style.display='none'; renderGrid(); currentRendition = null; currentPDF = null; }
@@ -896,7 +951,6 @@
         async function exportIndexOnly() { try { const dh = await window.showDirectoryPicker(); const all = await new Promise(res => { const data = []; const tx = db.transaction("books","readonly"); tx.objectStore("books").openCursor().onsuccess = e => { const c = e.target.result; if(c){ data.push(c.value); c.continue(); } else res(data); }; }); if(!all.length) return; const fh = await dh.getFileHandle(`Index_${new Date().toISOString().slice(0,10)}.json`, {create:true}); const wr = await fh.createWritable(); await wr.write(JSON.stringify(all,null,2)); await wr.close(); alert("导出完成！"); } catch(e){} }
         async function importIndexOnly(ev) { const f = ev.target.files[0]; if(!f) return; try { const content = JSON.parse(await f.text()); const tx = db.transaction("books","readwrite"); content.forEach(item => { tx.objectStore("books").get(item.path).onsuccess = e => { const ex = e.target.result || {}; tx.objectStore("books").put({...ex, ...item}); }; }); tx.oncomplete = () => { alert("导入完成！"); renderGrid(); }; } catch(e){} }
         function handleRename() { const n = prompt("重命名书库:", document.getElementById('libName').innerText); if(n){ document.getElementById('libName').innerText=n; localStorage.setItem('libName',n); } }
-
 
         // ==========================================
         // Crousimg 像素工坊核心逻辑
