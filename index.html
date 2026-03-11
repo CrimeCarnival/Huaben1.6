@@ -2,1092 +2,804 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crous 工具集 - 智能版</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Somnia Library Pro - Stable v3.4 (含Crous工具集)</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* ---------------- Clib 原生样式 ---------------- */
+        body { font-family: 'Inter', sans-serif; background-color: #f5f5f7; overflow: hidden; height: 100vh; color: #1d1d1f; }
+        .sidebar { width: 260px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(20px); border-right: 1px solid rgba(0,0,0,0.05); }
+        .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 1.5rem; padding: 1.5rem; }
+        
+        #viewer-main { position: fixed; inset: 0; background: white; z-index: 1000; display: none; flex-direction: column; }
+        .slide-panel { position: absolute; top: 56px; width: 300px; height: calc(100% - 56px); background: white; box-shadow: -15px 0 30px rgba(0,0,0,0.05); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1100; overflow-y: auto; }
+        #toc-panel { left: -300px; border-right: 1px solid #eee; box-shadow: 15px 0 30px rgba(0,0,0,0.05); }
+        #toc-panel.active { left: 0; }
+        #settings-panel { right: -300px; border-left: 1px solid #eee; }
+        #settings-panel.active { right: 0; }
+        #notes-panel { right: -300px; border-left: 1px solid #eee; }
+        #notes-panel.active { right: 0; }
+
+        #render-area { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; }
+        #epub-viewer, #pdf-viewer { width: 100%; height: 100%; }
+        #txt-viewer, #md-viewer { width: 100%; height: 100%; padding: 40px 15%; overflow-y: auto; line-height: 1.8; font-size: 18px; white-space: pre-wrap; display: none; word-break: break-all; }
+        #md-viewer { white-space: normal; }
+        #md-viewer h1 { font-size: 2em; font-weight: bold; margin-bottom: 1em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
+        #md-viewer blockquote { border-left: 4px solid #3b82f6; padding-left: 1em; color: #666; background: #f8fafc; padding: 10px; border-radius: 4px; }
+        
+        .flip-zone { position: absolute; top: 56px; bottom: 0; width: 40px; z-index: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; color: #2563eb; transition: 0.3s; }
+        .flip-zone:hover { opacity: 1; background: rgba(37, 99, 235, 0.05); }
+        .flip-left { left: 0; } .flip-right { right: 0; } 
+
+        .book-card .cover-box { aspect-ratio: 3/4.2; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: 0.3s; background: #e5e7eb; }
+        .book-card:hover .cover-box { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0,0,0,0.15); }
+        .no-cover-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px; text-align: center; font-size: 10px; font-weight: bold; color: #888; writing-mode: vertical-rl; background: #eee; }
+
+        .tag-pill { font-size: 9px; padding: 3px 8px; border-radius: 6px; background: #ebf4ff; color: #2563eb; margin: 2px; display: inline-block; cursor: pointer; }
+        .note-card { padding: 15px; border-bottom: 1px solid #f3f4f6; transition: 0.2s; }
+        .note-card:hover { background: #f9fafb; }
+
+        #hl-floating-btn { position: absolute; z-index: 2000; background: #2563eb; color: white; padding: 8px 16px; border-radius: 20px; font-size: 11px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(37,99,235,0.3); transform: translateX(-50%); transition: opacity 0.2s; }
+        #hl-floating-btn:hover { background: #1d4ed8; }
+
+        body.night-mode #viewer-main { background: #1a1a1a !important; }
+        body.night-mode .h-14, body.night-mode .slide-panel { background: #262626 !important; border-color: #333 !important; color: #eee !important; }
+        body.night-mode #txt-viewer, body.night-mode #md-viewer { color: #d1d1d6 !important; background: #1a1a1a !important; }
+        
+        .theme-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #ddd; cursor: pointer; position: relative; }
+        .theme-btn.active { border-color: #2563eb; transform: scale(1.15); box-shadow: 0 0 10px rgba(37,99,235,0.3); }
+        .theme-btn.active::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #2563eb; font-weight: bold; }
+
+        /* ---------------- Crous 工具集特定样式 ---------------- */
         :root {
-            --primary: #10b981;
-            --primary-hover: #059669;
-            --secondary: #3b82f6;
-            --secondary-hover: #2563eb;
-            --bg-color: #f3f4f6;
-            --card-bg: #ffffff;
-            --text-main: #1f2937;
-            --text-muted: #6b7280;
-            --border: #e5e7eb;
-            --radius: 12px;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --crous-primary: #10b981;
+            --crous-primary-hover: #059669;
+            --crous-secondary: #3b82f6;
+            --crous-secondary-hover: #2563eb;
+            --crous-card-bg: #ffffff;
+            --crous-text: #1f2937;
+            --crous-text-muted: #6b7280;
+            --crous-border: #e5e7eb;
+            --crous-radius: 12px;
+            --crous-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            margin: 0; padding: 20px;
-            color: var(--text-main); line-height: 1.5;
-        }
-        .container { max-width: 1280px; margin: 0 auto; padding: 0 10px; }
-        h1 { text-align: center; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.025em; }
-        h1 span { color: var(--primary); }
-        h2, h3 { font-weight: 600; margin-top: 0; }
-
-        /* 标签页 */
-        .tabs { display: flex; justify-content: center; background: var(--card-bg); padding: 6px; border-radius: 16px; box-shadow: var(--shadow); margin-bottom: 30px; max-width: 500px; margin-left: auto; margin-right: auto; }
-        .tab-button { flex: 1; padding: 12px; background: transparent; border: none; cursor: pointer; font-size: 16px; font-weight: 600; color: var(--text-muted); border-radius: 10px; transition: all 0.3s ease; }
-        .tab-button.active { background-color: var(--primary); color: white; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3); }
-        .tab-content { display: none; animation: fadeIn 0.4s ease; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .tool-card { background: var(--card-bg); padding: 30px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 30px; }
-
-        /* --- Crousimg 布局 --- */
+        .tool-card { background: var(--crous-card-bg); padding: 30px; border-radius: var(--crous-radius); box-shadow: var(--crous-shadow); margin-bottom: 30px; color: var(--crous-text); }
         .crousimg-layout { display: grid; grid-template-columns: 400px 1fr; gap: 30px; }
         @media (max-width: 1024px) { .crousimg-layout { grid-template-columns: 1fr; } }
         .control-section { display: flex; flex-direction: column; gap: 20px; }
 
-        .file-upload-group { background: #f9fafb; border: 2px dashed var(--border); border-radius: var(--radius); padding: 20px; text-align: center; transition: border-color 0.3s; }
-        .file-upload-group:hover { border-color: var(--primary); }
-        .file-upload-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--text-muted); }
-        input[type="file"] { width: 100%; font-size: 14px; }
-        input[type="file"]::file-selector-button { background-color: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; margin-right: 10px; cursor: pointer; transition: 0.2s; font-weight: 500; }
+        .file-upload-group { background: #f9fafb; border: 2px dashed var(--crous-border); border-radius: var(--crous-radius); padding: 20px; text-align: center; transition: border-color 0.3s; }
+        .file-upload-group:hover { border-color: var(--crous-primary); }
+        .file-upload-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: var(--crous-text-muted); }
+        .file-upload-group input[type="file"] { width: 100%; font-size: 14px; }
+        .file-upload-group input[type="file"]::file-selector-button { background-color: white; border: 1px solid var(--crous-border); border-radius: 6px; padding: 6px 12px; margin-right: 10px; cursor: pointer; transition: 0.2s; font-weight: 500; }
 
-        /* --- 缩略图区域 --- */
-        .thumbnails {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 12px;
-            max-height: 220px;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-            padding: 15px;
-            border-radius: var(--radius);
-            background: #fff;
-            margin-bottom: 10px;
-        }
+        .thumbnails { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px; max-height: 220px; overflow-y: auto; border: 1px solid var(--crous-border); padding: 15px; border-radius: var(--crous-radius); background: #fff; margin-bottom: 10px; }
         .thumb-item { position: relative; width: 100%; aspect-ratio: 1; cursor: pointer; transition: transform 0.2s; }
         .thumb-item:hover { transform: translateY(-2px); }
-        .thumb-item img {
-            width: 100%; height: 100%; object-fit: cover; border-radius: 8px; display: block;
-            border: 1px solid var(--border); transition: all 0.2s ease;
-        }
-        .thumb-item.selected img { border-color: transparent; box-shadow: 0 0 0 3px var(--primary), 0 4px 10px rgba(16, 185, 129, 0.3); }
-        .delete-btn {
-            position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
-            background-color: #ef4444; color: white; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 14px; line-height: 1; cursor: pointer;
-            border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            opacity: 0; transition: all 0.2s; z-index: 2;
-        }
+        .thumb-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; display: block; border: 1px solid var(--crous-border); transition: all 0.2s ease; }
+        .thumb-item.selected img { border-color: transparent; box-shadow: 0 0 0 3px var(--crous-primary), 0 4px 10px rgba(16, 185, 129, 0.3); }
+        .delete-btn { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; background-color: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; cursor: pointer; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); opacity: 0; transition: all 0.2s; z-index: 2; }
         .thumb-item:hover .delete-btn, .thumb-item.selected .delete-btn { opacity: 1; }
         .delete-btn:hover { background-color: #dc2626; transform: scale(1.1); }
 
-        /* --- 控件 --- */
         .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
         .control-item { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 13px; font-weight: 600; }
-        input[type="number"], select, input[type="text"] { padding: 10px; border: 1px solid var(--border); border-radius: 8px; width: 100%; }
-        input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
+        .control-item label, .tool-card label { font-size: 13px; font-weight: 600; }
+        .tool-card input[type="number"], .tool-card select, .tool-card input[type="text"] { padding: 10px; border: 1px solid var(--crous-border); border-radius: 8px; width: 100%; }
+        .tool-card input:focus, .tool-card select:focus { outline: none; border-color: var(--crous-primary); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
         
-        .crousimg-button, .hb-button { padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; width: 100%; }
-        .crousimg-button:hover, .hb-button:hover { background: var(--primary-hover); transform: translateY(-1px); }
-        
+        .crousimg-button, .hb-button { padding: 12px; background: var(--crous-primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; width: 100%; }
+        .crousimg-button:hover, .hb-button:hover { background: var(--crous-primary-hover); transform: translateY(-1px); }
         .preset-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-        .preset-buttons .crousimg-button { background: white; color: var(--text-main); border: 1px solid var(--border); padding: 8px; font-size: 13px; font-weight: 500; }
-        .preset-buttons .crousimg-button:hover { border-color: var(--secondary); color: var(--secondary); background: rgba(59, 130, 246, 0.05); }
+        .preset-buttons .crousimg-button { background: white; color: var(--crous-text); border: 1px solid var(--crous-border); padding: 8px; font-size: 13px; font-weight: 500; }
+        .preset-buttons .crousimg-button:hover { border-color: var(--crous-secondary); color: var(--crous-secondary); background: rgba(59, 130, 246, 0.05); }
+        #exportButton { background: var(--crous-secondary); margin-top: 15px; }
+        #exportButton:hover { background: var(--crous-secondary-hover); }
 
-        #exportButton { background: var(--secondary); margin-top: 15px; }
-        #exportButton:hover { background: var(--secondary-hover); }
-
-        .margin-controls-group { background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-top: 15px; }
+        .margin-controls-group { background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid var(--crous-border); margin-top: 15px; }
         .margin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .margin-item { display: flex; align-items: center; gap: 8px; }
-        .margin-item span { font-size: 12px; width: 15px; color: var(--text-muted); }
+        .margin-item span { font-size: 12px; width: 15px; color: var(--crous-text-muted); }
 
-        /* 预览区域样式 */
-        .preview-container { background: #eef2f6; border: 1px solid var(--border); border-radius: var(--radius); padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 600px; position: sticky; top: 20px; }
-        
-        /* 预览顶部导航条 */
-        .preview-header {
-            display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 20px;
-        }
-        .nav-btn {
-            background: white; border: 1px solid var(--border);
-            padding: 8px 16px; border-radius: 20px; cursor: pointer;
-            font-size: 13px; font-weight: 600; color: var(--text-main);
-            transition: all 0.2s; display: flex; align-items: center; gap: 5px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .nav-btn:hover:not(:disabled) { background: #f9fafb; border-color: var(--primary); color: var(--primary); }
+        .preview-container { background: #eef2f6; border: 1px solid var(--crous-border); border-radius: var(--crous-radius); padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 600px; position: sticky; top: 20px; }
+        .preview-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 20px; }
+        .nav-btn { background: white; border: 1px solid var(--crous-border); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--crous-text); transition: all 0.2s; display: flex; align-items: center; gap: 5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .nav-btn:hover:not(:disabled) { background: #f9fafb; border-color: var(--crous-primary); color: var(--crous-primary); }
         .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #f3f4f6; }
 
         .preview-wrapper { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); background: white; line-height: 0; transition: all 0.3s; }
         .preview-container img { max-width: 100%; max-height: 70vh; display: block; }
         .preview-info { margin-top: 20px; display: flex; gap: 15px; }
         .preview-tag { background: rgba(255,255,255,0.9); border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-family: monospace; }
-
         .progress-bar-container { height: 6px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin-top: 15px; opacity: 0; transition: opacity 0.3s; }
         .progress-bar-container.show { opacity: 1; }
-        .progress-bar { height: 100%; background: linear-gradient(90deg, var(--secondary), var(--primary)); width: 0%; transition: width 0.2s linear; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, var(--crous-secondary), var(--crous-primary)); width: 0%; transition: width 0.2s linear; }
 
-        /* HB1.6 样式 */
         .hb-container { gap: 20px; display: flex; flex-direction: column; }
-        .hb-textarea { width: 100%; height: 200px; padding: 20px; font-size: 16px; border: 1px solid var(--border); border-radius: var(--radius); resize: vertical; font-family: inherit; }
-        .hb-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
-        .hb-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #f9fafb; padding: 15px; border-radius: var(--radius); border: 1px solid var(--border); }
-        #output { width: 100%; min-height: 300px; padding: 30px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); line-height: 1.8; font-size: 18px; white-space: pre-wrap; word-wrap: break-word; }
-        .role-legend { background: #fff; padding: 20px; border-radius: var(--radius); border: 1px solid var(--border); margin-top: 20px; }
+        .hb-textarea { width: 100%; height: 200px; padding: 20px; font-size: 16px; border: 1px solid var(--crous-border); border-radius: var(--crous-radius); resize: vertical; font-family: inherit; }
+        .hb-textarea:focus { outline: none; border-color: var(--crous-primary); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
+        .hb-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #f9fafb; padding: 15px; border-radius: var(--crous-radius); border: 1px solid var(--crous-border); }
+        #output { width: 100%; min-height: 300px; padding: 30px; background: #fff; border: 1px solid var(--crous-border); border-radius: var(--crous-radius); line-height: 1.8; font-size: 18px; white-space: pre-wrap; word-wrap: break-word; }
+        .role-legend { background: #fff; padding: 20px; border-radius: var(--crous-radius); border: 1px solid var(--crous-border); margin-top: 20px; }
         .role-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f3f4f6; }
-        .btn-apply { background: var(--primary); width: auto; padding: 6px 12px; font-size: 12px; }
-        .btn-merge { background: #8b5cf6; width: auto; padding: 6px 12px; font-size: 12px; }
+        .btn-apply { background: var(--crous-primary); width: auto; padding: 6px 12px; font-size: 12px; border: none; color: white; border-radius: 4px; cursor: pointer; }
+        .ai-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 16px; background-color: #fff; border: 1px solid var(--crous-primary); color: var(--crous-primary); text-decoration: none; border-radius: 20px; font-size: 13px; font-weight: 600; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .ai-link:hover { background-color: var(--crous-primary); color: white; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
 
-        /* 新增：AI链接按钮样式 */
-        .ai-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 10px;
-            padding: 8px 16px;
-            background-color: #fff;
-            border: 1px solid var(--primary);
-            color: var(--primary);
-            text-decoration: none;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-            transition: all 0.2s;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .ai-link:hover {
-            background-color: var(--primary);
-            color: white;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        /* 书库管理样式 */
-        .library-container { height: 70vh; display: flex; overflow: hidden; }
-        .library-sidebar { width: 260px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); border-right: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; }
-        .library-main { flex: 1; overflow-y: auto; background: #f9fafb; }
-        .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1.5rem; padding: 2rem; }
-        
-        #viewer-main { position: fixed; inset: 0; background: white; z-index: 1000; display: none; flex-direction: column; }
-        .slide-panel { position: absolute; top: 56px; width: 320px; height: calc(100% - 56px); background: white; box-shadow: 15px 0 30px rgba(0,0,0,0.1); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1100; overflow-y: auto; }
-        #toc-panel { left: -320px; border-right: 1px solid #eee; }
-        #toc-panel.active { left: 0; }
-        #settings-panel { right: -320px; border-left: 1px solid #eee; }
-        #settings-panel.active { right: 0; }
-
-        #render-area { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; transition: background 0.3s; }
-        #epub-viewer { width: 100%; height: 100%; }
-        
-        .book-card img { aspect-ratio: 3/4.2; object-fit: cover; border-radius: 12px; transition: all 0.3s; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .book-card:hover img { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0,0,0,0.15); }
-        
-        .theme-btn { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #ddd; transition: all 0.2s; position: relative; cursor: pointer; }
-        .theme-btn.active { border-color: #2563eb; transform: scale(1.1); }
-        .theme-btn.active::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #2563eb; font-weight: bold; }
-
-        .toc-link { display: block; padding: 14px 24px; font-size: 13px; color: #555; border-bottom: 1px solid #f9f9f9; cursor: pointer; }
-        .toc-link:hover { background: #f0f7ff; color: #2563eb; }
-        
-        #pdf-viewer canvas { box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 85vh; width: auto !important; }
     </style>
 </head>
-<body>
+<body class="flex">
 
-<div class="container">
-    <h1>Crous <span>工具集</span></h1>
-    
-    <div class="tabs">
-        <button class="tab-button active" data-tab="crousimg">像素工坊</button>
-        <button class="tab-button" data-tab="hb16">智能画本</button>
-        <button class="tab-button" data-tab="library">电子书库</button>
+    <div id="hl-floating-btn" class="hidden" onclick="executeHighlight()">
+        <i class="fas fa-highlighter mr-1"></i> 划线笔记
     </div>
-    
-    <div id="crousimg" class="tab-content active">
-        <div class="crousimg-layout">
-            <div class="control-section">
-                <div class="tool-card">
-                    <h3>📂 图片选择</h3>
-                    <div class="file-upload-group">
-                        <label>导入图片 (支持累加)</label>
-                        <input type="file" id="fileInput" multiple accept="image/*">
-                        <div style="height:10px"></div>
-                        <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*" style="display:none">
-                        <button class="crousimg-button" onclick="document.getElementById('folderInput').click()" style="background:#fff; color:#333; border:1px solid #ccc;">📂 导入文件夹</button>
-                    </div>
-                    <div class="thumbnails" id="thumbnails">
-                        <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #9ca3af; font-size: 13px;">
-                            暂无图片，请上传
-                        </div>
-                    </div>
-                </div>
 
-                <div class="tool-card">
-                    <h3>⚙️ 参数设置</h3>
-                    <label style="display:block; margin-bottom:8px;">快速尺寸</label>
-                    <div class="preset-buttons">
-                        <button class="crousimg-button" data-preset="A5">A5</button>
-                        <button class="crousimg-button" data-preset="A4">A4</button>
-                        <button class="crousimg-button" data-preset="A3">A3</button>
-                        <button class="crousimg-button" data-preset="3inch">3寸</button>
-                        <button class="crousimg-button" data-preset="5inch">5寸</button>
-                        <button class="crousimg-button" data-preset="6inch">6寸</button>
-                    </div>
-                    <select id="presetSelect" style="margin-bottom: 15px;">
-                        <option value="">更多尺寸...</option>
-                        <option value="A2">A2 (42×59.4)</option>
-                        <option value="A1">A1 (59.4×84.1)</option>
-                        <option value="1inch">1寸 (2.5×3.5)</option>
-                        <option value="2inch">2寸 (3.5×4.5)</option>
-                        <option value="7inch">7寸 (12.7×17.8)</option>
-                        <option value="8inch">8寸 (15.2×20.3)</option>
-                        <option value="10inch">10寸 (20.3×25.4)</option>
-                        <option value="12inch">12寸 (25.4×30.5)</option>
-                        <option value="14inch">14寸 (28×35.6)</option>
-                        <option value="16inch">16寸 (30.5×40.6)</option>
-                        <option value="18inch">18寸 (35.6×45.7)</option>
-                        <option value="20inch">20寸 (40.6×50.8)</option>
-                        <option value="24inch">24寸 (50.8×61)</option>
-                        <option value="30inch">30寸 (61×76.2)</option>
-                        <option value="32inch">32寸 (66×81.3)</option>
-                        <option value="36inch">36寸 (61×91.4)</option>
-                    </select>
+    <aside class="sidebar flex flex-col h-full">
+        <div class="p-8"><h1 id="libName" onclick="handleRename()" class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent cursor-pointer">我的书库</h1></div>
+        <nav class="flex-1 px-4 space-y-1 overflow-y-auto">
+            <button id="nav-library" onclick="switchMainView('library')" class="w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl transition bg-white text-blue-600 shadow-sm"><i class="fas fa-layer-group w-8"></i> 全部藏书</button>
+            
+            <div class="pt-4 pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Crous 工具集</div>
+            <button id="nav-crousimg" onclick="switchMainView('crousimg')" class="w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl text-gray-500 hover:bg-white hover:text-green-600 transition"><i class="fas fa-camera-retro w-8"></i> 像素工坊</button>
+            <button id="nav-hb16" onclick="switchMainView('hb16')" class="w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl text-gray-500 hover:bg-white hover:text-purple-600 transition"><i class="fas fa-file-audio w-8"></i> 智能画本</button>
 
-                    <div class="controls-grid">
-                        <div class="control-item"><label>宽 (cm)</label><input type="number" id="widthInput" value="29.7" step="0.01"></div>
-                        <div class="control-item"><label>高 (cm)</label><input type="number" id="heightInput" value="21" step="0.01"></div>
-                        <div class="control-item"><label>DPI</label><input type="number" id="dpiInput" value="300"></div>
-                        <div style="display:flex; gap:8px; align-self:end; height:42px;">
-                            <button class="crousimg-button" id="rotateButton" style="background-color: var(--text-main); padding: 0 10px;" title="旋转当前图片">↻ 旋转</button>
-                            <button class="crousimg-button" id="swapButton" style="background-color: var(--text-main); padding: 0 10px;" title="交换画布宽高">⟷ 交换</button>
-                        </div>
-                    </div>
-
-                    <div class="margin-controls-group">
-                        <span class="margin-title">边距 (mm)</span>
-                        <div class="margin-grid">
-                            <div class="margin-item"><span>上</span><input type="number" id="marginTopInput" value="0"></div>
-                            <div class="margin-item"><span>下</span><input type="number" id="marginBottomInput" value="0"></div>
-                            <div class="margin-item"><span>左</span><input type="number" id="marginLeftInput" value="0"></div>
-                            <div class="margin-item"><span>右</span><input type="number" id="marginRightInput" value="0"></div>
-                        </div>
-                    </div>
-
-                    <button class="crousimg-button" id="exportButton">🚀 批量导出 PDF</button>
-                    <div class="progress-bar-container" id="progressContainer"><div class="progress-bar" id="progressBar"></div></div>
-                </div>
+            <a href="https://z-lib.fm/" target="_blank" class="w-full flex items-center px-4 py-3 text-sm font-semibold rounded-2xl text-gray-400 hover:bg-white hover:text-blue-500 transition group mt-4"><i class="fas fa-globe w-8 opacity-40 group-hover:opacity-100"></i> Z-Library</a>
+            <div class="pt-6 pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">分类标签</div>
+            <div id="tagList" class="flex flex-wrap px-4 gap-1"></div>
+            <div class="pt-6 pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">子目录</div>
+            <div id="dirList" class="space-y-1"></div>
+        </nav>
+        <div class="p-4 border-t border-gray-100">
+            <button onclick="startScan()" class="w-full py-3 bg-blue-600 text-white rounded-2xl text-xs font-bold shadow-lg mb-2">扫描文件夹</button>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="exportIndexOnly()" class="py-2 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-bold">导出索引</button>
+                <button onclick="document.getElementById('importInput').click()" class="py-2 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-bold">导入索引</button>
             </div>
+            <input type="file" id="importInput" class="hidden" accept=".json" onchange="importIndexOnly(event)">
+        </div>
+    </aside>
 
-            <div class="preview-section">
-                <div class="preview-container">
-                    <!-- 预览区域顶部导航栏 -->
-                    <div class="preview-header">
-                        <button class="nav-btn" id="prevBtn" disabled>◀ 上一张</button>
-                        <h3 style="margin:0; color:var(--text-muted); font-size:14px;">效果预览</h3>
-                        <button class="nav-btn" id="nextBtn" disabled>下一张 ▶</button>
+    <main class="flex-1 overflow-y-auto bg-gray-50 relative">
+        <header class="h-16 px-8 flex items-center justify-between sticky top-0 bg-gray-50/80 backdrop-blur-md z-10">
+            <h2 id="currentCategory" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Stable v3.4</h2>
+            <button onclick="clearCache()" class="text-[10px] font-bold text-red-400 hover:text-red-600 transition">重置所有缓存</button>
+        </header>
+        
+        <div id="view-library">
+            <div id="libraryGrid" class="library-grid"></div>
+        </div>
+
+        <div id="view-crousimg" style="display: none; padding: 20px; max-width: 1280px; margin: 0 auto;">
+            <div class="crousimg-layout">
+                <div class="control-section">
+                    <div class="tool-card">
+                        <h3 style="margin-top:0;">📂 图片选择</h3>
+                        <div class="file-upload-group">
+                            <label>导入图片 (支持累加)</label>
+                            <input type="file" id="fileInput" multiple accept="image/*">
+                            <div style="height:10px"></div>
+                            <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*" style="display:none">
+                            <button class="crousimg-button" onclick="document.getElementById('folderInput').click()" style="background:#fff; color:#333; border:1px solid #ccc;">📂 导入文件夹</button>
+                        </div>
+                        <div class="thumbnails" id="thumbnails">
+                            <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #9ca3af; font-size: 13px;">暂无图片，请上传</div>
+                        </div>
                     </div>
 
-                    <div class="preview-wrapper">
-                        <img id="previewImage" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTQ5NDk0IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCI+56m655m955S75biDIMK3IOmjjOiopzwvdGV4dD48L3N2Zz4=">
+                    <div class="tool-card">
+                        <h3 style="margin-top:0;">⚙️ 参数设置</h3>
+                        <label style="display:block; margin-bottom:8px;">快速尺寸</label>
+                        <div class="preset-buttons">
+                            <button class="crousimg-button" data-preset="A5">A5</button>
+                            <button class="crousimg-button" data-preset="A4">A4</button>
+                            <button class="crousimg-button" data-preset="A3">A3</button>
+                            <button class="crousimg-button" data-preset="3inch">3寸</button>
+                            <button class="crousimg-button" data-preset="5inch">5寸</button>
+                            <button class="crousimg-button" data-preset="6inch">6寸</button>
+                        </div>
+                        <select id="presetSelect" style="margin-bottom: 15px;">
+                            <option value="">更多尺寸...</option>
+                            <option value="A2">A2 (42×59.4)</option>
+                            <option value="A1">A1 (59.4×84.1)</option>
+                            <option value="1inch">1寸 (2.5×3.5)</option>
+                            <option value="2inch">2寸 (3.5×4.5)</option>
+                            <option value="7inch">7寸 (12.7×17.8)</option>
+                            <option value="8inch">8寸 (15.2×20.3)</option>
+                            <option value="10inch">10寸 (20.3×25.4)</option>
+                            <option value="12inch">12寸 (25.4×30.5)</option>
+                            <option value="14inch">14寸 (28×35.6)</option>
+                            <option value="16inch">16寸 (30.5×40.6)</option>
+                            <option value="18inch">18寸 (35.6×45.7)</option>
+                            <option value="20inch">20寸 (40.6×50.8)</option>
+                            <option value="24inch">24寸 (50.8×61)</option>
+                            <option value="30inch">30寸 (61×76.2)</option>
+                            <option value="32inch">32寸 (66×81.3)</option>
+                            <option value="36inch">36寸 (61×91.4)</option>
+                        </select>
+
+                        <div class="controls-grid">
+                            <div class="control-item"><label>宽 (cm)</label><input type="number" id="widthInput" value="29.7" step="0.01"></div>
+                            <div class="control-item"><label>高 (cm)</label><input type="number" id="heightInput" value="21" step="0.01"></div>
+                            <div class="control-item"><label>DPI</label><input type="number" id="dpiInput" value="300"></div>
+                            <div style="display:flex; gap:8px; align-self:end; height:42px;">
+                                <button class="crousimg-button" id="rotateButton" style="background-color: var(--crous-text); padding: 0 10px;" title="旋转当前图片">↻ 旋转</button>
+                                <button class="crousimg-button" id="swapButton" style="background-color: var(--crous-text); padding: 0 10px;" title="交换画布宽高">⟷ 交换</button>
+                            </div>
+                        </div>
+
+                        <div class="margin-controls-group">
+                            <span class="margin-title" style="font-size: 13px; font-weight: 600;">边距 (mm)</span>
+                            <div class="margin-grid" style="margin-top: 5px;">
+                                <div class="margin-item"><span>上</span><input type="number" id="marginTopInput" value="0"></div>
+                                <div class="margin-item"><span>下</span><input type="number" id="marginBottomInput" value="0"></div>
+                                <div class="margin-item"><span>左</span><input type="number" id="marginLeftInput" value="0"></div>
+                                <div class="margin-item"><span>右</span><input type="number" id="marginRightInput" value="0"></div>
+                            </div>
+                        </div>
+
+                        <button class="crousimg-button" id="exportButton">🚀 批量导出 PDF</button>
+                        <div class="progress-bar-container" id="progressContainer"><div class="progress-bar" id="progressBar"></div></div>
                     </div>
-                    <div class="preview-info">
-                         <div class="preview-tag" id="previewSizeTag">尺寸: 29.7 x 21 cm</div>
-                         <div class="preview-tag" id="previewPxTag">像素: 3508 x 2480 px</div>
+                </div>
+
+                <div class="preview-section">
+                    <div class="preview-container">
+                        <div class="preview-header">
+                            <button class="nav-btn" id="prevBtn" disabled>◀ 上一张</button>
+                            <h3 style="margin:0; color:var(--crous-text-muted); font-size:14px;">效果预览</h3>
+                            <button class="nav-btn" id="nextBtn" disabled>下一张 ▶</button>
+                        </div>
+                        <div class="preview-wrapper">
+                            <img id="previewImage" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTQ5NDk0IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCI+56m655m955S75biDIMK3IOmjjOiopzwvdGV4dD48L3N2Zz4=">
+                        </div>
+                        <div class="preview-info">
+                             <div class="preview-tag" id="previewSizeTag">尺寸: 29.7 x 21 cm</div>
+                             <div class="preview-tag" id="previewPxTag">像素: 3508 x 2480 px</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-    
-    <div id="hb16" class="tab-content">
-        <div class="tool-card hb-container">
-            <div style="text-align: center; margin-bottom: 10px;">
-                <h2>🎨 有声书智能画本</h2>
-                <p style="color: var(--text-muted);">建议将文本后加提示词#分析文本，将角色台词前用【**：】标注。#  #用有声演播的方法，将每段句子后标注（情绪）#，发AI生成后粘贴文本</p>
-                <!-- 新增：AI链接按钮 -->
-                <a href="https://chat.qwen.ai" target="_blank" class="ai-link">
-                    🤖 打开通义千问 (Qwen AI) 辅助创作
-                </a>
-            </div>
-            <textarea class="hb-textarea" id="input" placeholder="在此粘贴剧本内容..."></textarea>
-            <div class="hb-controls">
-                <button class="hb-button" onclick="autoHighlight()" style="width:auto">✨ 智能着色</button>
-                <input type="text" id="roleInput" placeholder="角色名" style="width: 150px">
-                <button class="hb-button" onclick="manualHighlight()" style="background-color: var(--text-main); width:auto">手动着色</button>
-                <button class="hb-button" onclick="copyResult()" style="background-color: #333; width:auto; margin-left:auto">📋 复制</button>
-            </div>
-            <div id="output"></div>
-            <div class="role-legend" id="legend"><div id="roleList"></div></div>
-        </div>
-    </div>
 
-    <!-- 书库管理标签页 -->
-    <div id="library" class="tab-content">
-        <div class="library-container">
-            <aside class="library-sidebar">
-                <div class="p-8">
-                    <h1 id="libName" onclick="handleRename()" class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent cursor-pointer">我的书库</h1>
-                    <p class="text-[9px] text-gray-400 mt-1 uppercase font-bold tracking-widest italic">Somnia Pro Library</p>
+        <div id="view-hb16" style="display: none; padding: 20px; max-width: 1000px; margin: 0 auto;">
+            <div class="tool-card hb-container">
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <h2 style="font-size: 1.5rem; margin-top:0;">🎨 有声书智能画本</h2>
+                    <p style="color: var(--crous-text-muted); font-size: 14px;">建议将文本后加提示词#分析文本，将角色台词前用【**：】标注。#  #用有声演播的方法，将每段句子后标注（情绪）#，发AI生成后粘贴文本</p>
+                    <a href="https://chat.qwen.ai" target="_blank" class="ai-link">
+                        🤖 打开通义千问 (Qwen AI) 辅助创作
+                    </a>
                 </div>
-                <nav class="flex-1 px-4 space-y-1">
-                    <button onclick="renderGrid('all')" class="w-full flex items-center px-4 py-3 text-sm font-semibold rounded-2xl text-gray-500 hover:bg-white hover:text-blue-600 transition">
-                        <i class="fas fa-layer-group w-8"></i> 全部藏书
-                    </button>
-                    <a href="https://z-lib.fm/" target="_blank" class="w-full flex items-center px-4 py-3 text-sm font-semibold rounded-2xl text-gray-500 hover:bg-white transition italic"><i class="fas fa-globe w-8 text-blue-400"></i>Z-Library</a>
-                    <div id="dirList" class="mt-4 space-y-1"></div>
-                </nav>
-                <div class="p-4 border-t border-gray-100">
-                    <button onclick="startScan()" class="w-full py-3 bg-blue-600 text-white rounded-2xl text-xs font-bold shadow-lg hover:bg-blue-700 transition">扫描文件夹</button>
-                    <button id="relinkBtn" onclick="relink()" class="hidden w-full py-3 mt-2 bg-green-50 text-green-600 border border-green-200 rounded-2xl text-xs font-bold transition">恢复连接</button>
+                <textarea class="hb-textarea" id="input" placeholder="在此粘贴剧本内容..."></textarea>
+                <div class="hb-controls">
+                    <button class="hb-button" onclick="autoHighlight()" style="width:auto">✨ 智能着色</button>
+                    <input type="text" id="roleInput" placeholder="角色名" style="width: 150px">
+                    <button class="hb-button" onclick="manualHighlight()" style="background-color: var(--crous-text); width:auto">手动着色</button>
+                    <button class="hb-button" onclick="copyResult()" style="background-color: #333; width:auto; margin-left:auto">📋 复制</button>
                 </div>
-            </aside>
-
-            <main class="library-main">
-                <header class="h-16 px-8 flex items-center justify-between sticky top-0 bg-gray-50/80 backdrop-blur-md z-10">
-                    <h2 id="currentCategory" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Books Sorted by Progress</h2>
-                    <button onclick="clearCache()" class="text-[10px] font-bold text-red-300">重置所有缓存</button>
-                </header>
-                <div id="libraryGrid" class="library-grid"></div>
-            </main>
+                <div id="output"></div>
+                <div class="role-legend" id="legend"><div id="roleList"></div></div>
+            </div>
         </div>
-    </div>
+    </main>
 
-    <!-- 书库阅读器主界面 -->
     <div id="viewer-main">
-        <div class="h-14 px-6 flex items-center justify-between border-b border-gray-100 bg-white z-20 shadow-sm">
+        <div class="h-14 px-6 flex items-center justify-between border-b bg-white z-20">
             <div class="flex items-center space-x-2">
-                <button onclick="closeViewer()" class="p-2 hover:bg-gray-100 rounded-xl transition"><i class="fas fa-arrow-left text-gray-400"></i></button>
-                <button onclick="togglePanel('toc-panel')" class="p-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold transition"><i class="fas fa-list-ul"></i> 目录</button>
-                <button onclick="togglePanel('settings-panel')" class="p-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold transition"><i class="fas fa-cog"></i> 设置</button>
+                <button onclick="closeViewer()" class="p-2 hover:bg-gray-100 rounded-xl transition text-gray-400"><i class="fas fa-arrow-left"></i></button>
+                <button onclick="togglePanel('toc-panel')" class="p-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold transition">目录</button>
+                <button onclick="togglePanel('notes-panel')" class="p-2 bg-yellow-50 text-yellow-600 rounded-xl text-xs font-bold transition">笔记</button>
+                <button onclick="togglePanel('settings-panel')" class="p-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold transition"><i class="fas fa-cog"></i></button>
+                <button id="nightToggle" onclick="toggleNightMode()" class="p-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold transition"><i class="fas fa-moon"></i></button>
             </div>
-            <div id="readerTitle" class="text-xs font-bold text-gray-400 truncate max-w-sm italic">加载中...</div>
+            <div id="readerTitle" class="text-xs font-bold text-gray-400 truncate max-w-sm italic">书名</div>
             <div class="flex items-center space-x-3">
                 <button onclick="doPrev()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-left"></i></button>
-                <span id="progTag" class="text-[10px] font-bold bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full min-w-[70px] text-center">0%</span>
+                <span id="progTag" class="text-[10px] font-bold bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full min-w-[70px] text-center italic">0%</span>
                 <button onclick="doNext()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-right"></i></button>
             </div>
         </div>
         
-        <div id="toc-panel" class="slide-panel"></div>
+        <div class="flip-zone flip-left" onclick="handleFlipZoneClick('prev')"><i class="fas fa-chevron-left"></i></div>
+        <div class="flip-zone flip-right" onclick="handleFlipZoneClick('next')"><i class="fas fa-chevron-right"></i></div>
 
-        <div id="settings-panel" class="slide-panel">
-            <div class="p-6 space-y-8">
-                <div>
-                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 italic">Display Layout (PDF/EPUB)</h4>
-                    <div class="flex bg-gray-100 p-1 rounded-xl">
-                        <button id="mode-single" onclick="updateMode('single')" class="flex-1 py-2 text-xs rounded-lg transition">单页模式</button>
-                        <button id="mode-double" onclick="updateMode('double')" class="flex-1 py-2 text-xs rounded-lg transition">双页并排</button>
-                    </div>
+        <div id="toc-panel" class="slide-panel"></div>
+        <div id="notes-panel" class="slide-panel flex flex-col">
+            <div class="p-6 border-b flex justify-between items-center"><h4 class="text-xs font-bold uppercase tracking-widest">藏书笔记</h4><button onclick="exportNotesToMd()" class="text-[9px] text-blue-500 font-bold hover:underline">导出 MD</button></div>
+            <div id="notesList" class="flex-1 overflow-y-auto pb-20"></div>
+        </div>
+
+        <div id="settings-panel" class="slide-panel p-6 space-y-8">
+            <div>
+                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">布局显示</h4>
+                <div class="flex bg-gray-100 p-1 rounded-xl"><button id="mode-single" onclick="updateMode('single')" class="flex-1 py-2 text-xs rounded-lg transition">单页</button><button id="mode-double" onclick="updateMode('double')" class="flex-1 py-2 text-xs rounded-lg transition">双页</button></div>
+            </div>
+            <div>
+                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">交互开关</h4>
+                <div class="space-y-3">
+                    <label class="flex items-center justify-between text-xs text-gray-600">点击侧边翻页 <input type="checkbox" id="check-click" onchange="updateSettings()"></label>
+                    <label class="flex items-center justify-between text-xs text-gray-600">鼠标滚轮翻页 <input type="checkbox" id="check-wheel" onchange="updateSettings()"></label>
+                    <label class="flex items-center justify-between text-xs text-gray-600">键盘方向翻页 <input type="checkbox" id="check-keys" onchange="updateSettings()"></label>
                 </div>
-                <div>
-                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 italic">Interactive Toggles</h4>
-                    <div class="space-y-4">
-                        <label class="flex items-center justify-between text-xs text-gray-600">点击两侧翻页 <input type="checkbox" id="check-click" onchange="updateSettings()"></label>
-                        <label class="flex items-center justify-between text-xs text-gray-600">鼠标滚轮翻页 <input type="checkbox" id="check-wheel" onchange="updateSettings()"></label>
-                        <label class="flex items-center justify-between text-xs text-gray-600">键盘方向键翻页 <input type="checkbox" id="check-keys" onchange="updateSettings()"></label>
-                    </div>
+            </div>
+            <div>
+                <div class="flex justify-between items-center mb-4"><h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">PDF 缩放</h4><button onclick="resetPdfScale()" class="text-[9px] text-blue-500 font-bold">重置</button></div>
+                <input type="range" id="pdfSlider" min="0.5" max="3" step="0.1" value="1" oninput="updatePdfScaleSlider()" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+            <div>
+                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">排版系统</h4>
+                <div class="flex items-center justify-between mb-2"><button onclick="changeFontSize(-2)" class="w-8 h-8 bg-gray-100 rounded-lg"><i class="fas fa-minus text-[10px]"></i></button><span id="fontLabel" class="text-xs font-bold">18px</span><button onclick="changeFontSize(2)" class="w-8 h-8 bg-gray-100 rounded-lg"><i class="fas fa-plus text-[10px]"></i></button></div>
+                <div class="flex justify-between mb-2"><span class="text-[10px] text-gray-400">字间距</span><span id="spacingLabel" class="text-[10px] font-bold">0px</span></div>
+                <input type="range" id="spacingSlider" min="0" max="10" step="1" value="0" oninput="updateLetterSpacing(this.value)" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+            <div>
+                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">背景色 (强制覆盖)</h4>
+                <div class="flex justify-between px-2">
+                    <button onclick="setTheme('default')" id="t-default" class="theme-btn" style="background: #ffffff;"></button>
+                    <button onclick="setTheme('almond')" id="t-almond" class="theme-btn" style="background: rgb(250, 249, 222);"></button>
+                    <button onclick="setTheme('green')" id="t-green" class="theme-btn" style="background: rgb(204, 232, 207);"></button>
+                    <button onclick="setTheme('gray')" id="t-gray" class="theme-btn" style="background: rgb(234, 234, 239);"></button>
                 </div>
-                <div>
-                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 italic">Background Theme</h4>
-                    <div class="flex justify-between px-1">
-                        <button onclick="setTheme('default')" id="t-default" class="theme-btn bg-white" title="默认"></button>
-                        <button onclick="setTheme('almond')" id="t-almond" class="theme-btn" style="background: rgb(250, 249, 222);" title="杏仁黄"></button>
-                        <button onclick="setTheme('green')" id="t-green" class="theme-btn" style="background: rgb(204, 232, 207);" title="暗夜绿"></button>
-                        <button onclick="setTheme('gray')" id="t-gray" class="theme-btn" style="background: rgb(234, 234, 239);" title="极光灰"></button>
-                        <button onclick="setTheme('night')" id="t-night" class="theme-btn bg-gray-900" title="夜间"></button>
-                    </div>
-                </div>
+            </div>
+            <div class="pt-4 border-t">
+                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">书籍标签</h4>
+                <div id="bookTags" class="flex flex-wrap gap-1 mb-4"></div>
+                <div class="flex gap-2 mb-4"><input type="text" id="newTagInput" placeholder="新标签..." class="flex-1 bg-gray-50 border rounded-lg px-3 py-2 text-xs"><button onclick="addBookTag()" class="bg-blue-600 text-white px-3 rounded-lg text-xs font-bold uppercase">ADD</button></div>
+                <div id="suggestedTags" class="flex flex-wrap gap-1"></div>
             </div>
         </div>
 
-        <div id="render-area" onclick="handleReaderClick(event)">
+        <div id="render-area" onclick="handleAreaClick(event)">
             <div id="epub-viewer"></div>
-            <div id="pdf-viewer" class="hidden overflow-auto h-full w-full flex flex-col items-center"></div>
+            <div id="txt-viewer"></div>
+            <div id="md-viewer"></div>
+            <div id="pdf-viewer" class="hidden overflow-auto h-full w-full flex flex-col items-center bg-gray-50 relative"></div>
         </div>
     </div>
 
-    <!-- 扫描覆盖层 -->
-    <div id="scanOverlay" class="fixed inset-0 bg-white/95 backdrop-blur-xl z-[2000] hidden flex items-center justify-center">
-        <div class="w-64 text-center">
-            <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden mb-4"><div id="scanBar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div></div>
-            <p id="scanText" class="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Syncing Library...</p>
-        </div>
+    <div id="scanOverlay" class="fixed inset-0 hidden flex items-center justify-center text-center z-[5000]">
+        <div class="w-64 bg-white p-8 rounded-3xl shadow-2xl"><div class="h-1 w-full bg-gray-100 rounded-full overflow-hidden mb-4"><div id="scanBar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div></div><p id="scanText" class="text-[10px] font-bold text-gray-400 tracking-widest uppercase italic font-mono">Syncing Library...</p></div>
     </div>
-</div>
 
-<script>
-    // ---------------- 标签页逻辑 ----------------
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            button.classList.add('active');
-            document.getElementById(button.getAttribute('data-tab')).classList.add('active');
-        });
-    });
-
-    // ---------------- 像素工坊核心逻辑 ----------------
-    let allImages = [];
-    let currentImgObject = null;
-    let selectedIndex = -1; 
-
-    // 处理文件输入
-    ['folderInput', 'fileInput'].forEach(id => {
-        document.getElementById(id).addEventListener('change', function(event) {
-            const newFiles = Array.from(event.target.files).filter(file => file.type.startsWith('image/'));
-            if (newFiles.length === 0) return;
-
-            const newItems = newFiles.map(f => ({ file: f, rotation: 0 }));
-            allImages = allImages.concat(newItems);
+    <script>
+        // ==========================================
+        // 核心视图切换逻辑 (新增)
+        // ==========================================
+        function switchMainView(view) {
+            document.getElementById('view-library').style.display = 'none';
+            document.getElementById('view-crousimg').style.display = 'none';
+            document.getElementById('view-hb16').style.display = 'none';
             
-            if (selectedIndex === -1) {
-                selectedIndex = 0;
+            const baseClass = "w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl text-gray-500 hover:bg-white transition ";
+            document.getElementById('nav-library').className = baseClass + "hover:text-blue-600";
+            document.getElementById('nav-crousimg').className = baseClass + "hover:text-green-600";
+            document.getElementById('nav-hb16').className = baseClass + "hover:text-purple-600";
+
+            document.getElementById('view-' + view).style.display = 'block';
+            
+            if(view === 'library') {
+                document.getElementById('nav-library').className = "w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl transition bg-white text-blue-600 shadow-sm";
+                document.getElementById('currentCategory').innerText = "全部藏书";
+                renderGrid('all');
+            } else if (view === 'crousimg') {
+                document.getElementById('nav-crousimg').className = "w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl transition bg-white text-green-600 shadow-sm";
+                document.getElementById('currentCategory').innerText = "Crous - 像素工坊";
+                if(typeof redrawPreview === 'function') redrawPreview();
+            } else if (view === 'hb16') {
+                document.getElementById('nav-hb16').className = "w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl transition bg-white text-purple-600 shadow-sm";
+                document.getElementById('currentCategory').innerText = "Crous - 智能画本";
             }
-            
-            renderThumbnails();
-            loadAndPreviewImage(allImages[selectedIndex]);
-            updateNavButtons(); // 更新按钮状态
-            this.value = '';
-        });
-    });
-
-    // 切换图片函数
-    function switchImage(direction) {
-        const newIndex = selectedIndex + direction;
-        if (newIndex >= 0 && newIndex < allImages.length) {
-            selectedIndex = newIndex;
-            renderThumbnails(); // 更新缩略图选中状态
-            loadAndPreviewImage(allImages[selectedIndex]);
-            updateNavButtons(); // 更新按钮状态
         }
-    }
 
-    // 更新导航按钮状态
-    function updateNavButtons() {
-        const prevBtn = document.getElementById('prevBtn');
-        const nextBtn = document.getElementById('nextBtn');
+        // ==========================================
+        // Clib_v34 原版逻辑
+        // ==========================================
+        let db, currentRendition, currentPDF, currentBook, rootHandle, currentBookBuffer;
+        let wheelBusy = false, globalTags = new Set();
+        let tempEpubSelection = null;
+
+        const pdfjs = window['pdfjs-dist/build/pdf'];
+        pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        let prefs = JSON.parse(localStorage.getItem('SomniaPrefs_v34')) || {
+            mode: 'double', fontSize: 18, letterSpacing: 0, isNight: false, pdfScale: 'auto', theme: 'default',
+            controls: { click: true, wheel: true, keys: true }
+        };
+
+        const dbReq = indexedDB.open("SomniaLibrary_v34", 1);
+        dbReq.onupgradeneeded = e => {
+            let d = e.target.result;
+            d.createObjectStore("books", { keyPath: "path" });
+            d.createObjectStore("config", { keyPath: "id" });
+        };
+        dbReq.onsuccess = e => { db = e.target.result; initProgram(); };
+
+        function initProgram() {
+            document.getElementById('libName').innerText = localStorage.getItem('libName') || "我的书库";
+            switchMainView('library'); // 默认进入全部藏书
+            checkHandle(); setTimeout(syncSettingsDOM, 300);
+        }
+
+        function initHighlighting() {
+            if(!currentRendition) return;
+            currentRendition.on("selected", (cfiRange, contents) => {
+                const range = contents.range(cfiRange);
+                const rect = range.getBoundingClientRect();
+                const iframe = contents.document.defaultView.frameElement;
+                const iframeRect = iframe.getBoundingClientRect();
+                const absoluteLeft = rect.left + iframeRect.left;
+                const absoluteTop = rect.top + iframeRect.top;
+
+                const btn = document.getElementById('hl-floating-btn');
+                btn.style.left = (absoluteLeft + rect.width / 2) + 'px';
+                btn.style.top = (absoluteTop - 45) + 'px';
+                btn.classList.remove('hidden');
+                
+                tempEpubSelection = { cfi: cfiRange, text: range.toString(), contents };
+            });
+        }
+
+        function hideHighlightTriggers() {
+            document.getElementById('hl-floating-btn').classList.add('hidden');
+            if(tempEpubSelection && tempEpubSelection.contents) tempEpubSelection.contents.window.getSelection().removeAllRanges();
+            tempEpubSelection = null;
+        }
+
+        window.executeHighlight = () => {
+            if(!tempEpubSelection) return;
+            const { cfi, text } = tempEpubSelection;
+            saveNote(cfi, text, 'epub');
+            currentRendition.annotations.add("highlight", cfi, {}, (e)=>{});
+            hideHighlightTriggers();
+        };
+
+        function saveNote(loc, text, type) {
+            if(!currentBook.notes) currentBook.notes = [];
+            currentBook.notes.push({ loc, text, type, comment: "", time: Date.now() });
+            db.transaction("books", "readwrite").objectStore("books").put(currentBook);
+            renderNotesPanel();
+        }
+
+        function renderNotesPanel() {
+            const list = document.getElementById('notesList'); if(!list) return;
+            list.innerHTML = '';
+            (currentBook.notes || []).forEach((note, index) => {
+                const location = note.loc || note.cfi; 
+                const type = note.type || 'epub';
+                const icon = type === 'pdf' ? 'fa-bookmark text-red-400' : 'fa-highlighter text-blue-500';
+                const border = type === 'pdf' ? 'border-red-400' : 'border-blue-400';
+                const card = document.createElement('div'); card.className = 'note-card';
+                card.innerHTML = `
+                    <div class="text-[9px] text-gray-400 mb-2 flex items-center"><i class="fas ${icon} mr-2"></i> ${new Date(note.time).toLocaleString()}</div>
+                    <div class="text-xs italic text-gray-600 border-l-2 ${border} pl-3 mb-3 cursor-pointer hover:text-blue-600 transition" onclick="jumpToNote('${location}', '${type}')">${note.text}</div>
+                    <textarea class="w-full bg-white border border-gray-100 text-[10px] p-2 rounded-lg outline-none focus:ring-1 focus:ring-blue-200" placeholder="记录心得..." onchange="editNote(${index}, this.value)">${note.comment || ''}</textarea>
+                    <div class="flex justify-end mt-1"><button onclick="deleteNote(${index})" class="text-[9px] text-red-300 hover:text-red-500 transition"><i class="fas fa-trash mr-1"></i> 删除</button></div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        window.jumpToNote = (loc, type) => {
+            if(type === 'pdf') { const page = parseInt(loc.replace('PDF-Page-', '')); renderPDF(page); } 
+            else if (currentRendition) currentRendition.display(loc);
+            togglePanel(null);
+        };
+        window.editNote = (idx, val) => { currentBook.notes[idx].comment = val; db.transaction("books", "readwrite").objectStore("books").put(currentBook); };
+        window.deleteNote = (idx) => {
+            if(!confirm("确定删除这条记录吗？")) return;
+            const note = currentBook.notes[idx];
+            if((note.type === 'epub' || !note.type) && currentRendition) currentRendition.annotations.remove(note.loc || note.cfi, "highlight");
+            currentBook.notes.splice(idx, 1);
+            db.transaction("books", "readwrite").objectStore("books").put(currentBook); renderNotesPanel();
+        };
+
+        function exportNotesToMd() {
+            if(!currentBook.notes?.length) return alert("暂无笔记");
+            let md = `# 《${currentBook.title}》笔记\n\n`;
+            currentBook.notes.forEach(n => { md += `> ${n.text}\n\n**心得**：${n.comment || "无"}\n\n---\n\n`; });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([md], {type: "text/markdown"})); a.download = `${currentBook.title}_SomniaNotes.md`; a.click();
+        }
+
+        function applyThemeStyles() {
+            const themes = { default:{bg:'#ffffff', text:'#1d1d1f'}, almond:{bg:'rgb(250, 249, 222)', text:'#3e392d'}, green:{bg:'rgb(204, 232, 207)', text:'#2e3a2e'}, gray:{bg:'rgb(234, 234, 239)', text:'#2d2d3a'} };
+            const active = themes[prefs.theme] || themes['default'];
+            const bg = prefs.isNight ? '#1a1a1a' : active.bg; const text = prefs.isNight ? '#d1d1d6' : active.text;
+            document.getElementById('render-area').style.backgroundColor = bg;
+            ['txt-viewer', 'md-viewer'].forEach(id => { const tv = document.getElementById(id); if(tv) { tv.style.backgroundColor = bg; tv.style.color = text; tv.style.fontSize = prefs.fontSize + 'px'; tv.style.letterSpacing = prefs.letterSpacing + 'px'; } });
+            document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active')); const b = document.getElementById('t-'+prefs.theme); if(b) b.classList.add('active');
+            if(currentRendition) { const themeName = 'custom-' + Date.now(); currentRendition.themes.register(themeName, { "body": { "background": bg + " !important", "color": text + " !important", "font-size": prefs.fontSize + "px !important", "letter-spacing": prefs.letterSpacing + "px !important" } }); currentRendition.themes.select(themeName); }
+        }
+
+        function setTheme(t) { prefs.theme = t; savePrefs(); applyThemeStyles(); }
+        function toggleNightMode() { prefs.isNight = !prefs.isNight; document.body.classList.toggle('night-mode', prefs.isNight); savePrefs(); applyThemeStyles(); updateNightIcon(); }
+        function updateNightIcon() { document.querySelector('#nightToggle i').className = prefs.isNight ? 'fas fa-sun' : 'fas fa-moon'; }
+        function changeFontSize(d) { prefs.fontSize = Math.min(60, Math.max(12, prefs.fontSize+d)); document.getElementById('fontLabel').innerText = prefs.fontSize+'px'; applyThemeStyles(); savePrefs(); }
+        function updateLetterSpacing(val) { prefs.letterSpacing = val; document.getElementById('spacingLabel').innerText = val+'px'; applyThemeStyles(); savePrefs(); }
+
+        async function initEpub(data, cfi) {
+            const viewer = document.getElementById('epub-viewer'); viewer.innerHTML = '';
+            document.getElementById('viewer-main').style.display = 'flex';
+            document.getElementById('pdf-viewer').classList.add('hidden'); document.getElementById('txt-viewer').style.display = 'none'; document.getElementById('md-viewer').style.display = 'none'; viewer.style.display = 'block';
+            const book = ePub(data); await book.opened;
+            const toc = await book.navigation.toc; const panel = document.getElementById('toc-panel'); panel.innerHTML = '<div class="p-6 font-bold text-gray-400 uppercase text-[10px] border-b">Table of Contents</div>';
+            const renderToc = items => items.forEach(t => { const a = document.createElement('div'); a.className = 'toc-link p-3 text-xs border-b cursor-pointer hover:text-blue-600'; a.innerText = t.label.trim(); a.onclick = () => { currentRendition.display(t.href); togglePanel(null); }; panel.appendChild(a); if(t.subitems) renderToc(t.subitems); }); if(toc) renderToc(toc);
+            currentRendition = book.renderTo("epub-viewer", { width: "100%", height: "100%", flow: "paginated", manager: "default", spread: prefs.mode==='double'?'always':'none', allowScriptedContent: true });
+            currentRendition.on('rendered', (sec, view) => { 
+                view.document.addEventListener('keydown', handleGlobalKey); 
+                view.document.addEventListener('click', (e) => { const sel = view.document.getSelection(); if(sel && sel.toString().trim().length > 0) return; handleAreaClick(); hideHighlightTriggers(); }); 
+                view.document.addEventListener('contextmenu', e => { const sel = view.document.getSelection(); if(sel && sel.toString().trim().length > 0 && tempEpubSelection) { e.preventDefault(); executeHighlight(); } });
+            });
+            currentRendition.on("relocated", loc => { const p = book.locations.percentageFromCfi(loc.start.cfi); const dp = (p && p > 0) ? (p * 100).toFixed(1) : (Number(currentBook.progress) || 0).toFixed(1); document.getElementById('progTag').innerText = dp + '%'; window.updateProgress(parseFloat(dp), {cfi: loc.start.cfi}); });
+            (currentBook.notes || []).forEach(n => { if(n.type==='epub' || !n.type) currentRendition.annotations.add("highlight", n.loc || n.cfi, {}, (e)=>{}); });
+            initHighlighting();
+            book.locations.generate(1000).then(() => { if (currentRendition) { const p = book.locations.percentageFromCfi(currentRendition.currentLocation().start.cfi); if(p) document.getElementById('progTag').innerText = (p*100).toFixed(1)+'%'; } });
+            await book.ready; try { await currentRendition.display(cfi || undefined); } catch(e) { await currentRendition.display(); }
+            applyThemeStyles(); setTimeout(() => { if (currentRendition) currentRendition.resize(); }, 400);
+        }
+
+        async function renderPDF(num) {
+            const v = document.getElementById('pdf-viewer'); v.innerHTML = ''; v.classList.remove('hidden');
+            document.getElementById('epub-viewer').style.display = 'none'; document.getElementById('txt-viewer').style.display = 'none'; document.getElementById('md-viewer').style.display = 'none';
+            const isD = prefs.mode === 'double' && num > 1;
+            const container = document.createElement('div'); container.className = isD ? "flex gap-8 justify-center p-4 relative" : "flex justify-center p-4 relative"; v.appendChild(container);
+            v.oncontextmenu = e => { e.preventDefault(); if(confirm(`要将 PDF 第 ${num} 页加入笔记书签吗？`)) { saveNote(`PDF-Page-${num}`, `🔖 PDF 书签 - 停留在第 ${num} 页`, 'pdf'); } };
+            try {
+                const page = await currentPDF.getPage(num); const raw = page.getViewport({ scale: 1 });
+                let sc = 1.0; if(prefs.pdfScale === 'auto') sc = Math.min((v.clientWidth-100)/(isD?raw.width*2:raw.width), (v.clientHeight-80)/raw.height, 1.6); else sc = parseFloat(prefs.pdfScale);
+                const draw = async n => { const pg = await currentPDF.getPage(n); const canvas = document.createElement('canvas'); canvas.className="shadow-2xl my-4 bg-white"; const ctx=canvas.getContext('2d'), vp=pg.getViewport({scale:sc}); canvas.height=vp.height; canvas.width=vp.width; container.appendChild(canvas); await pg.render({canvasContext: ctx, viewport: vp}).promise; };
+                await draw(num); if(isD && num+1 <= currentPDF.numPages) await draw(num+1);
+                document.getElementById('progTag').innerText = `${num}/${currentPDF.numPages}`; window.updateProgress((num/currentPDF.numPages)*100, {lastPage: num});
+            } catch(e) {}
+        }
+
+        function initMd(buf) {
+            const v = document.getElementById('md-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('txt-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
+            let text = new TextDecoder('utf-8').decode(buf); if(text.includes('')) text = new TextDecoder('gbk').decode(buf);
+            v.innerHTML = marked.parse(text); v.scrollTop = 0; applyThemeStyles();
+            setTimeout(() => { v.scrollTop = (currentBook.txtPos || 0) * v.scrollHeight; }, 100);
+            v.onscroll = () => { const pos = v.scrollTop / v.scrollHeight; window.updateProgress(pos*100, { txtPos: pos }); document.getElementById('progTag').innerText = (pos * 100).toFixed(1) + '%'; };
+        }
+
+        function initTxt(buf) {
+            const v = document.getElementById('txt-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('md-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
+            let text = new TextDecoder('utf-8').decode(buf); if(text.includes('')) text = new TextDecoder('gbk').decode(buf);
+            v.innerText = text; v.scrollTop = 0; applyThemeStyles();
+            setTimeout(() => { v.scrollTop = (currentBook.txtPos || 0) * v.scrollHeight; }, 100);
+            v.onscroll = () => { const pos = v.scrollTop / v.scrollHeight; window.updateProgress(pos*100, { txtPos: pos }); document.getElementById('progTag').innerText = (pos * 100).toFixed(1) + '%'; };
+        }
+
+        async function extractCover(buf, path) { return new Promise(async (resolve) => { try { if (path.endsWith('.epub')) { const book = ePub(buf); const url = await book.coverUrl(); if (url) { const res = await fetch(url); const blob = await res.blob(); const rd = new FileReader(); rd.onloadend = () => { book.destroy(); resolve(rd.result); }; rd.readAsDataURL(blob); } else { book.destroy(); resolve(""); } } else if (path.endsWith('.pdf')) { const pdf = await pdfjs.getDocument(buf).promise; const page = await pdf.getPage(1); const cv = document.createElement('canvas'); const vp = page.getViewport({ scale: 0.3 }); cv.width = vp.width; cv.height = vp.height; await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise; const data = cv.toDataURL("image/jpeg", 0.6); pdf.destroy(); resolve(data); } else resolve(""); } catch (e) { resolve(""); } }); }
         
-        if (allImages.length === 0) {
-            prevBtn.disabled = true;
-            nextBtn.disabled = true;
-            return;
+        async function startScan() { try { rootHandle = await window.showDirectoryPicker(); db.transaction("config","readwrite").objectStore("config").put({id:"root", handle:rootHandle}); document.getElementById('scanOverlay').classList.remove('hidden'); let files = []; async function walk(h, p) { for await (const e of h.values()) { const rel = p ? `${p}/${e.name}` : e.name; if(e.kind==='file' && ['pdf','epub','txt','md'].includes(e.name.split('.').pop().toLowerCase())) files.push({h:e, p:rel}); else if(e.kind==='directory') await walk(e, rel); } } await walk(rootHandle, ""); for(let i=0; i<files.length; i++){ document.getElementById('scanBar').style.width = ((i+1)/files.length*100)+'%'; await new Promise(r => setTimeout(r, 20)); try { await saveBook(files[i].h, files[i].p); } catch(err) { } } } catch(e) { } finally { document.getElementById('scanOverlay').classList.add('hidden'); renderGrid(); } }
+        async function saveBook(h, p) { const txR = db.transaction("books","readonly"); const ex = await new Promise(r => { txR.objectStore("books").get(p).onsuccess=e=>r(e.target.result); }); let cover = ""; if (ex && ex.cover) { cover = ex.cover; } else { try { const file = await h.getFile(); const buf = await file.arrayBuffer(); cover = await extractCover(buf, p); } catch(e) { } } db.transaction("books","readwrite").objectStore("books").put({ title:h.name, path:p, handle:h, cover, progress:ex?Number(ex.progress):0, lastPage:ex?ex.lastPage:1, notes:ex?ex.notes:[], type:p.split('.').pop().toUpperCase(), folder:p.includes('/')?p.split('/')[0]:'根目录', tags:ex?ex.tags:[] }); }
+        
+        function renderGrid(filter = 'all') { if(!db) return; const grid = document.getElementById('libraryGrid'); grid.innerHTML = ''; const dirs = new Set(), tags = new Set(), all = []; db.transaction("books", "readonly").objectStore("books").openCursor().onsuccess = e => { const c = e.target.result; if(c) { all.push(c.value); (c.value.tags || []).forEach(t => { tags.add(t); globalTags.add(t); }); dirs.add(c.value.folder); c.continue(); } else { all.sort((a,b) => (Number(b.progress)||0) - (Number(a.progress)||0)).forEach(b => { if(filter === 'all' || b.folder === filter || (b.tags && b.tags.includes(filter))) { const p = Number(b.progress) || 0; const div = document.createElement('div'); div.className = "book-card flex flex-col cursor-pointer"; div.onclick = () => openReader(b); let cvHTML = b.cover ? `<img src="${b.cover}" class="w-full h-full object-cover">` : `<div class="no-cover-label">${b.title}</div>`; div.innerHTML = `<div class="cover-box mb-3">${cvHTML}<div class="absolute bottom-2 right-2 ${p>=99.5?'bg-green-500':'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-lg">${p>=99.5?'已阅读':p.toFixed(0)+'%'}</div></div><h3 class="text-[11px] font-bold text-gray-700 line-clamp-2 px-1 leading-tight">${b.title}</h3>`; grid.appendChild(div); } }); document.getElementById('tagList').innerHTML = Array.from(tags).map(t => `<span onclick="renderGrid('${t}')" class="tag-pill">${t}</span>`).join(''); document.getElementById('dirList').innerHTML = Array.from(dirs).map(d => `<button onclick="renderGrid('${d}')" class="w-full text-left px-4 py-2 text-[10px] text-gray-400 hover:text-blue-600 font-bold truncate">📁 ${d}</button>`).join(''); updateSuggestedTagsUI(); } }; }
+        async function openReader(book) { currentBook = book; document.getElementById('viewer-main').style.display = 'flex'; document.getElementById('readerTitle').innerText = book.title; renderBookTags(); renderNotesPanel(); if(await book.handle.queryPermission() !== 'granted') await book.handle.requestPermission(); currentBookBuffer = await (await book.handle.getFile()).arrayBuffer(); const ext = book.path.split('.').pop().toLowerCase(); if(ext === 'pdf') { currentPDF = await pdfjs.getDocument(currentBookBuffer).promise; renderPDF(book.lastPage || 1); } else if(ext === 'txt') { initTxt(currentBookBuffer); } else if(ext === 'md') { initMd(currentBookBuffer); } else { initEpub(currentBookBuffer, book.cfi); } }
+        
+        window.updateProgress = (p, ex) => { if(!currentBook) return; const tx = db.transaction("books","readwrite"); tx.objectStore("books").get(currentBook.path).onsuccess = e => { const b = e.target.result; if(b){ b.progress = Number(p); Object.assign(b, ex); tx.objectStore("books").put(b); } }; };
+        window.updateMode = (m) => { let lastCfi = currentRendition ? currentRendition.currentLocation()?.start?.cfi : null; prefs.mode = m; updateModeBtnUI(); savePrefs(); if (currentBook.type === 'EPUB') initEpub(currentBookBuffer, lastCfi); else if (currentBook.type === 'PDF') renderPDF(currentBook.lastPage); };
+        window.clearCache = () => { if(confirm("彻底重置？这将删除所有进度和笔记。")){ if(db) db.close(); indexedDB.deleteDatabase("SomniaLibrary_v34").onsuccess = () => location.reload(); } };
+        window.updateSettings = () => { prefs.controls.click = document.getElementById('check-click').checked; prefs.controls.wheel = document.getElementById('check-wheel').checked; prefs.controls.keys = document.getElementById('check-keys').checked; savePrefs(); };
+        
+        function updatePdfScaleSlider() { prefs.pdfScale = document.getElementById('pdfSlider').value; savePrefs(); if(currentPDF) renderPDF(currentBook.lastPage); }
+        function resetPdfScale() { prefs.pdfScale = 'auto'; document.getElementById('pdfSlider').value = 1; savePrefs(); if(currentPDF) renderPDF(currentBook.lastPage); }
+        
+        function handleGlobalKey(e) { if(['INPUT','TEXTAREA'].includes(e.target.tagName)) return; if(e.ctrlKey && e.key.toLowerCase()==='e') { e.preventDefault(); exportIndexOnly(); return; } if(e.ctrlKey && e.key.toLowerCase()==='i') { e.preventDefault(); document.getElementById('importInput').click(); return; } if(!prefs.controls.keys) return; if(document.getElementById('viewer-main').style.display === 'flex'){ if(e.key === 'ArrowRight' || e.key === ' ') doNext(); if(e.key === 'ArrowLeft') doPrev(); if(e.key === 'Escape') closeViewer(); } }
+        window.onkeydown = handleGlobalKey;
+        window.onwheel = e => { if (document.getElementById('viewer-main').style.display !== 'flex' || wheelBusy || !prefs.controls.wheel) return; if(Math.abs(e.deltaY) < 40) return; wheelBusy = true; if(e.deltaY > 0) doNext(); else doPrev(); setTimeout(()=>wheelBusy=false, 500); };
+        function doNext() { const activeV = document.querySelector('#render-area > div:not(.hidden):not([style*="display: none"])'); if(activeV && !['epub-viewer', 'pdf-viewer'].includes(activeV.id)) { activeV.scrollTop += window.innerHeight * 0.7; return; } if(currentPDF) { let s = (prefs.mode==='double'&&currentBook.lastPage>1)?2:1; if(currentBook.lastPage+s<=currentPDF.numPages) renderPDF(currentBook.lastPage+=s); } else currentRendition?.next(); }
+        function doPrev() { const activeV = document.querySelector('#render-area > div:not(.hidden):not([style*="display: none"])'); if(activeV && !['epub-viewer', 'pdf-viewer'].includes(activeV.id)) { activeV.scrollTop -= window.innerHeight * 0.7; return; } if(currentPDF) { let s = (prefs.mode==='double'&&currentBook.lastPage>2)?2:1; if(currentBook.lastPage-s>=1) renderPDF(currentBook.lastPage-=s); } else currentRendition?.prev(); }
+        function handleAreaClick(e) { if(document.querySelector('.slide-panel.active')) togglePanel(null); hideHighlightTriggers(); }
+        function handleFlipZoneClick(dir) { if(!prefs.controls.click || (currentBook && ['TXT', 'MD'].includes(currentBook.type))) return; togglePanel(null); if(dir === 'next') doNext(); else doPrev(); }
+        
+        function syncSettingsDOM() { try { const get = id => document.getElementById(id); if(get('check-click')) get('check-click').checked = prefs.controls.click; if(get('check-wheel')) get('check-wheel').checked = prefs.controls.wheel; if(get('check-keys')) get('check-keys').checked = prefs.controls.keys; if(get('fontLabel')) get('fontLabel').innerText = prefs.fontSize + 'px'; if(get('spacingSlider')) get('spacingSlider').value = prefs.letterSpacing; if(get('spacingLabel')) get('spacingLabel').innerText = prefs.letterSpacing + 'px'; if(get('pdfSlider')) get('pdfSlider').value = (prefs.pdfScale === 'auto' ? 1 : prefs.pdfScale); updateModeBtnUI(); updateNightIcon(); applyThemeStyles(); } catch(e) {} }
+        function updateModeBtnUI() { const isD = prefs.mode==='double'; document.getElementById('mode-double').className = isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400'; document.getElementById('mode-single').className = !isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400'; }
+        function togglePanel(id) { ['toc-panel','settings-panel','notes-panel'].forEach(p=>{ const el = document.getElementById(p); if(p===id) el.classList.toggle('active'); else el.classList.remove('active'); }); }
+        function closeViewer() { document.getElementById('viewer-main').style.display='none'; renderGrid(); currentRendition = null; currentPDF = null; }
+        function savePrefs() { localStorage.setItem('SomniaPrefs_v34', JSON.stringify(prefs)); }
+        
+        async function checkHandle() { db.transaction("config","readonly").objectStore("config").get("root").onsuccess=e=>{ if(e.target.result) rootHandle=e.target.result.handle; }; }
+        function updateSuggestedTagsUI() { const container = document.getElementById('suggestedTags'); if(!container) return; container.innerHTML = Array.from(globalTags).map(t => `<span class="tag-pill" onclick="addExistingTag('${t}')">${t}</span>`).join(''); }
+        function addExistingTag(tag) { if(!currentBook.tags) currentBook.tags = []; if(!currentBook.tags.includes(tag)) { currentBook.tags.push(tag); db.transaction("books", "readwrite").objectStore("books").put(currentBook); renderBookTags(); } }
+        function addBookTag() { const inp = document.getElementById('newTagInput'); const v = inp.value.trim(); if(v && currentBook){ if(!currentBook.tags) currentBook.tags=[]; if(!currentBook.tags.includes(v)) currentBook.tags.push(v); globalTags.add(v); db.transaction("books","readwrite").objectStore("books").put(currentBook); renderBookTags(); updateSuggestedTagsUI(); inp.value=''; } }
+        function renderBookTags() { const container = document.getElementById('bookTags'); if(container) container.innerHTML = (currentBook.tags||[]).map(t=>`<span class="tag-pill">${t} <i class="fas fa-times ml-1 cursor-pointer" onclick="removeTag('${t}')"></i></span>`).join(''); renderGrid(); }
+        function removeTag(t) { currentBook.tags = currentBook.tags.filter(tg=>tg!==t); db.transaction("books","readwrite").objectStore("books").put(currentBook); renderBookTags(); }
+        
+        async function exportIndexOnly() { try { const dh = await window.showDirectoryPicker(); const all = await new Promise(res => { const data = []; const tx = db.transaction("books","readonly"); tx.objectStore("books").openCursor().onsuccess = e => { const c = e.target.result; if(c){ data.push(c.value); c.continue(); } else res(data); }; }); if(!all.length) return; const fh = await dh.getFileHandle(`Index_${new Date().toISOString().slice(0,10)}.json`, {create:true}); const wr = await fh.createWritable(); await wr.write(JSON.stringify(all,null,2)); await wr.close(); alert("导出完成！"); } catch(e){} }
+        async function importIndexOnly(ev) { const f = ev.target.files[0]; if(!f) return; try { const content = JSON.parse(await f.text()); const tx = db.transaction("books","readwrite"); content.forEach(item => { tx.objectStore("books").get(item.path).onsuccess = e => { const ex = e.target.result || {}; tx.objectStore("books").put({...ex, ...item}); }; }); tx.oncomplete = () => { alert("导入完成！"); renderGrid(); }; } catch(e){} }
+        function handleRename() { const n = prompt("重命名书库:", document.getElementById('libName').innerText); if(n){ document.getElementById('libName').innerText=n; localStorage.setItem('libName',n); } }
+
+
+        // ==========================================
+        // Crousimg 像素工坊核心逻辑
+        // ==========================================
+        let allImages = [];
+        let currentImgObject = null;
+        let selectedIndex = -1; 
+
+        ['folderInput', 'fileInput'].forEach(id => {
+            document.getElementById(id).addEventListener('change', function(event) {
+                const newFiles = Array.from(event.target.files).filter(file => file.type.startsWith('image/'));
+                if (newFiles.length === 0) return;
+                const newItems = newFiles.map(f => ({ file: f, rotation: 0 }));
+                allImages = allImages.concat(newItems);
+                if (selectedIndex === -1) selectedIndex = 0;
+                renderThumbnails(); loadAndPreviewImage(allImages[selectedIndex]); updateNavButtons();
+                this.value = '';
+            });
+        });
+
+        function switchImage(direction) {
+            const newIndex = selectedIndex + direction;
+            if (newIndex >= 0 && newIndex < allImages.length) {
+                selectedIndex = newIndex; renderThumbnails(); loadAndPreviewImage(allImages[selectedIndex]); updateNavButtons();
+            }
         }
 
-        prevBtn.disabled = selectedIndex <= 0;
-        nextBtn.disabled = selectedIndex >= allImages.length - 1;
-    }
-
-    // 绑定切换按钮事件
-    document.getElementById('prevBtn').addEventListener('click', () => switchImage(-1));
-    document.getElementById('nextBtn').addEventListener('click', () => switchImage(1));
-
-    function renderThumbnails() {
-        const container = document.getElementById('thumbnails');
-        container.innerHTML = '';
-
-        if (allImages.length === 0) {
-            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #9ca3af; font-size: 13px;">暂无图片，请上传</div>';
-            selectedIndex = -1;
-            document.getElementById('previewImage').src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTQ5NDk0IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCI+56m655m955S75biDIMK3IOmjjOiopzwvdGV4dD48L3N2Zz4=";
-            updateNavButtons();
-            return;
+        function updateNavButtons() {
+            const prevBtn = document.getElementById('prevBtn'); const nextBtn = document.getElementById('nextBtn');
+            if (allImages.length === 0) { prevBtn.disabled = true; nextBtn.disabled = true; return; }
+            prevBtn.disabled = selectedIndex <= 0; nextBtn.disabled = selectedIndex >= allImages.length - 1;
         }
 
-        allImages.forEach((item, index) => {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = `thumb-item ${index === selectedIndex ? 'selected' : ''}`;
-            
-            const img = document.createElement('img');
-            img.alt = item.file.name;
+        document.getElementById('prevBtn').addEventListener('click', () => switchImage(-1));
+        document.getElementById('nextBtn').addEventListener('click', () => switchImage(1));
+
+        function renderThumbnails() {
+            const container = document.getElementById('thumbnails'); container.innerHTML = '';
+            if (allImages.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #9ca3af; font-size: 13px;">暂无图片，请上传</div>';
+                selectedIndex = -1;
+                document.getElementById('previewImage').src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTQ5NDk0IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCI+56m655m955S75biDIMK3IOmjjOiopzwvdGV4dD48L3N2Zz4=";
+                updateNavButtons(); return;
+            }
+            allImages.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `thumb-item ${index === selectedIndex ? 'selected' : ''}`;
+                const img = document.createElement('img'); img.alt = item.file.name;
+                const reader = new FileReader(); reader.onload = e => img.src = e.target.result; reader.readAsDataURL(item.file);
+                const delBtn = document.createElement('div'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '&times;'; delBtn.title = '删除';
+                delBtn.onclick = (e) => { e.stopPropagation(); deleteImage(index); };
+                itemDiv.onclick = () => { selectedIndex = index; renderThumbnails(); loadAndPreviewImage(item); updateNavButtons(); };
+                itemDiv.appendChild(img); itemDiv.appendChild(delBtn); container.appendChild(itemDiv);
+            });
+        }
+
+        function deleteImage(index) {
+            allImages.splice(index, 1);
+            if (allImages.length === 0) selectedIndex = -1;
+            else if (index === selectedIndex) selectedIndex = index < allImages.length ? index : allImages.length - 1;
+            else if (index < selectedIndex) selectedIndex--;
+            renderThumbnails(); updateNavButtons();
+            if (selectedIndex !== -1) loadAndPreviewImage(allImages[selectedIndex]);
+        }
+
+        function loadAndPreviewImage(item) {
+            if(!item) return;
             const reader = new FileReader();
-            reader.onload = e => img.src = e.target.result;
+            reader.onload = function(event) { const img = new Image(); img.src = event.target.result; img.onload = function() { currentImgObject = img; redrawPreview(); }; };
             reader.readAsDataURL(item.file);
-
-            const delBtn = document.createElement('div');
-            delBtn.className = 'delete-btn';
-            delBtn.innerHTML = '&times;';
-            delBtn.title = '删除';
-            delBtn.onclick = (e) => {
-                e.stopPropagation();
-                deleteImage(index);
-            };
-
-            itemDiv.onclick = () => {
-                selectedIndex = index;
-                renderThumbnails(); 
-                loadAndPreviewImage(item);
-                updateNavButtons();
-            };
-
-            itemDiv.appendChild(img);
-            itemDiv.appendChild(delBtn);
-            container.appendChild(itemDiv);
-        });
-    }
-
-    function deleteImage(index) {
-        allImages.splice(index, 1);
-        if (allImages.length === 0) {
-            selectedIndex = -1;
-        } else if (index === selectedIndex) {
-            selectedIndex = index < allImages.length ? index : allImages.length - 1;
-        } else if (index < selectedIndex) {
-            selectedIndex--;
         }
-        renderThumbnails();
-        updateNavButtons();
-        if (selectedIndex !== -1) {
-            loadAndPreviewImage(allImages[selectedIndex]);
+
+        function debounce(func, wait) {
+            let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); };
         }
-    }
 
-    function loadAndPreviewImage(item) {
-        if(!item) return;
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = function() {
-                currentImgObject = img;
-                redrawPreview();
-            };
-        };
-        reader.readAsDataURL(item.file);
-    }
-
-    function debounce(func, wait) {
-        let timeout;
-        return function(...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
-
-    function getRotatedSource(img, rotation) {
-        if (rotation === 0) return img;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        if (rotation === 90 || rotation === 270) {
-            canvas.width = img.height;
-            canvas.height = img.width;
-        } else {
-            canvas.width = img.width;
-            canvas.height = img.height;
+        function getRotatedSource(img, rotation) {
+            if (rotation === 0) return img;
+            const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            if (rotation === 90 || rotation === 270) { canvas.width = img.height; canvas.height = img.width; } else { canvas.width = img.width; canvas.height = img.height; }
+            ctx.translate(canvas.width / 2, canvas.height / 2); ctx.rotate(rotation * Math.PI / 180); ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            return canvas;
         }
-        
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(rotation * Math.PI / 180);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        return canvas;
-    }
 
-    function redrawPreview() {
-        if (!currentImgObject || selectedIndex === -1) return;
-        
-        const rotation = allImages[selectedIndex].rotation;
-        const sourceImg = getRotatedSource(currentImgObject, rotation);
-
-        const dpi = parseInt(document.getElementById('dpiInput').value) || 300;
-        const widthCm = parseFloat(document.getElementById('widthInput').value) || 29.7;
-        const heightCm = parseFloat(document.getElementById('heightInput').value) || 21;
-        const widthPx = cmToPx(widthCm, dpi);
-        const heightPx = cmToPx(heightCm, dpi);
-        
-        document.getElementById('previewSizeTag').textContent = `尺寸: ${widthCm} x ${heightCm} cm`;
-        document.getElementById('previewPxTag').textContent = `像素: ${widthPx} x ${heightPx} px`;
-
-        const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value) || 0);
-        const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value) || 0);
-        const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value) || 0);
-        const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value) || 0);
-
-        if (widthPx <= 0 || heightPx <= 0) return;
-
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = widthPx;
-        canvas.height = heightPx;
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const availW = widthPx - marginLeft - marginRight;
-        const availH = heightPx - marginTop - marginBottom;
-
-        if (availW > 0 && availH > 0) {
-            const scale = Math.min(availW / sourceImg.width, availH / sourceImg.height);
-            const drawW = sourceImg.width * scale;
-            const drawH = sourceImg.height * scale;
-            const x = marginLeft + (availW - drawW) / 2;
-            const y = marginTop + (availH - drawH) / 2;
-            ctx.drawImage(sourceImg, x, y, drawW, drawH);
+        function redrawPreview() {
+            if (!currentImgObject || selectedIndex === -1) return;
+            const rotation = allImages[selectedIndex].rotation;
+            const sourceImg = getRotatedSource(currentImgObject, rotation);
+            const dpi = parseInt(document.getElementById('dpiInput').value) || 300;
+            const widthCm = parseFloat(document.getElementById('widthInput').value) || 29.7;
+            const heightCm = parseFloat(document.getElementById('heightInput').value) || 21;
+            const widthPx = cmToPx(widthCm, dpi); const heightPx = cmToPx(heightCm, dpi);
+            document.getElementById('previewSizeTag').textContent = `尺寸: ${widthCm} x ${heightCm} cm`; document.getElementById('previewPxTag').textContent = `像素: ${widthPx} x ${heightPx} px`;
+            const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value) || 0); const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value) || 0);
+            const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value) || 0); const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value) || 0);
+            if (widthPx <= 0 || heightPx <= 0) return;
+            const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); canvas.width = widthPx; canvas.height = heightPx;
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const availW = widthPx - marginLeft - marginRight; const availH = heightPx - marginTop - marginBottom;
+            if (availW > 0 && availH > 0) { const scale = Math.min(availW / sourceImg.width, availH / sourceImg.height); const drawW = sourceImg.width * scale; const drawH = sourceImg.height * scale; const x = marginLeft + (availW - drawW) / 2; const y = marginTop + (availH - drawH) / 2; ctx.drawImage(sourceImg, x, y, drawW, drawH); }
+            document.getElementById('previewImage').src = canvas.toDataURL('image/jpeg');
         }
-        document.getElementById('previewImage').src = canvas.toDataURL('image/jpeg');
-    }
 
-    const debouncedRedraw = debounce(redrawPreview, 100);
-    ['widthInput', 'heightInput', 'dpiInput', 'marginTopInput', 'marginBottomInput', 'marginLeftInput', 'marginRightInput'].forEach(id => {
-        document.getElementById(id).addEventListener('input', debouncedRedraw);
-    });
+        const debouncedRedraw = debounce(redrawPreview, 100);
+        ['widthInput', 'heightInput', 'dpiInput', 'marginTopInput', 'marginBottomInput', 'marginLeftInput', 'marginRightInput'].forEach(id => { document.getElementById(id).addEventListener('input', debouncedRedraw); });
+        document.getElementById('swapButton').addEventListener('click', function() { const w = document.getElementById('widthInput'); const h = document.getElementById('heightInput'); [w.value, h.value] = [h.value, w.value]; redrawPreview(); });
+        document.getElementById('rotateButton').addEventListener('click', function() { if (selectedIndex === -1) return alert('请先选择一张图片'); allImages[selectedIndex].rotation = (allImages[selectedIndex].rotation + 90) % 360; redrawPreview(); });
+        document.querySelectorAll('.preset-buttons button').forEach(button => { button.addEventListener('click', function() { applyPreset(this.dataset.preset); }); });
+        document.getElementById('presetSelect').addEventListener('change', function() { applyPreset(this.value); });
 
-    document.getElementById('swapButton').addEventListener('click', function() {
-        const w = document.getElementById('widthInput');
-        const h = document.getElementById('heightInput');
-        [w.value, h.value] = [h.value, w.value];
-        redrawPreview();
-    });
-
-    document.getElementById('rotateButton').addEventListener('click', function() {
-        if (selectedIndex === -1) return alert('请先选择一张图片');
-        allImages[selectedIndex].rotation = (allImages[selectedIndex].rotation + 90) % 360;
-        redrawPreview();
-    });
-
-    document.querySelectorAll('.preset-buttons button').forEach(button => {
-        button.addEventListener('click', function() { applyPreset(this.dataset.preset); });
-    });
-    document.getElementById('presetSelect').addEventListener('change', function() { applyPreset(this.value); });
-
-    function applyPreset(preset) {
-        if (!preset) return;
-        let w, h;
-        switch (preset) {
-            case 'A5': w = 14.8; h = 21; break;
-            case 'A4': w = 29.7; h = 21; break;
-            case 'A3': w = 29.7; h = 42; break;
-            case 'A2': w = 42; h = 59.4; break;
-            case 'A1': w = 59.4; h = 84.1; break;
-            case '1inch': w = 2.5; h = 3.5; break;
-            case '2inch': w = 3.5; h = 4.5; break;
-            case '3inch': w = 5.1; h = 7.6; break;
-            case '5inch': w = 8.9; h = 12.7; break;
-            case '6inch': w = 10.2; h = 15.2; break;
-            case '7inch': w = 12.7; h = 17.8; break;
-            case '8inch': w = 15.2; h = 20.3; break;
-            case '10inch': w = 20.3; h = 25.4; break;
-            case '12inch': w = 25.4; h = 30.5; break;
-            case '14inch': w = 28; h = 35.6; break;
-            case '16inch': w = 30.5; h = 40.6; break;
-            case '18inch': w = 35.6; h = 45.7; break;
-            case '20inch': w = 40.6; h = 50.8; break;
-            case '24inch': w = 50.8; h = 61; break;
-            case '30inch': w = 61; h = 76.2; break;
-            case '32inch': w = 66; h = 81.3; break;
-            case '36inch': w = 61; h = 91.4; break;
+        function applyPreset(preset) {
+            if (!preset) return; let w, h;
+            switch (preset) { case 'A5': w=14.8;h=21; break; case 'A4': w=29.7;h=21; break; case 'A3': w=29.7;h=42; break; case 'A2': w=42;h=59.4; break; case 'A1': w=59.4;h=84.1; break; case '1inch': w=2.5;h=3.5; break; case '2inch': w=3.5;h=4.5; break; case '3inch': w=5.1;h=7.6; break; case '5inch': w=8.9;h=12.7; break; case '6inch': w=10.2;h=15.2; break; case '7inch': w=12.7;h=17.8; break; case '8inch': w=15.2;h=20.3; break; case '10inch': w=20.3;h=25.4; break; case '12inch': w=25.4;h=30.5; break; case '14inch': w=28;h=35.6; break; case '16inch': w=30.5;h=40.6; break; case '18inch': w=35.6;h=45.7; break; case '20inch': w=40.6;h=50.8; break; case '24inch': w=50.8;h=61; break; case '30inch': w=61;h=76.2; break; case '32inch': w=66;h=81.3; break; case '36inch': w=61;h=91.4; break; }
+            if (w && h) { document.getElementById('widthInput').value = w; document.getElementById('heightInput').value = h; redrawPreview(); }
         }
-        if (w && h) { document.getElementById('widthInput').value = w; document.getElementById('heightInput').value = h; redrawPreview(); }
-    }
-    function cmToPx(cm, dpi) { return Math.round(cm * dpi / 2.54); }
-    function mmToPx(mm) { const dpi = parseInt(document.getElementById('dpiInput').value); return Math.round(mm * dpi / 25.4); }
+        function cmToPx(cm, dpi) { return Math.round(cm * dpi / 2.54); }
+        function mmToPx(mm) { const dpi = parseInt(document.getElementById('dpiInput').value); return Math.round(mm * dpi / 25.4); }
 
-    document.getElementById('exportButton').addEventListener('click', async function() {
-        if (allImages.length === 0) return alert('请先选择图片！');
-        const { jsPDF } = window.jspdf;
-        const widthCm = parseFloat(document.getElementById('widthInput').value);
-        const heightCm = parseFloat(document.getElementById('heightInput').value);
-        const dpi = parseInt(document.getElementById('dpiInput').value);
-        const widthPx = cmToPx(widthCm, dpi);
-        const heightPx = cmToPx(heightCm, dpi);
-        const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value)||0);
-        const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value)||0);
-        const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value)||0);
-        const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value)||0);
-
-        const pdf = new jsPDF({ orientation: widthCm > heightCm ? 'landscape' : 'portrait', unit: 'cm', format: [widthCm, heightCm] });
-        const progressBar = document.getElementById('progressBar');
-        document.getElementById('progressContainer').classList.add('show');
-        
-        for (let i = 0; i < allImages.length; i++) {
-            if (i > 0) pdf.addPage([widthCm, heightCm], widthCm > heightCm ? 'landscape' : 'portrait');
-            await new Promise(resolve => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = new Image();
-                    img.src = e.target.result;
-                    img.onload = function() {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = widthPx; canvas.height = heightPx;
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        
-                        const sourceImg = getRotatedSource(img, allImages[i].rotation);
-                        
-                        const availW = widthPx - marginLeft - marginRight;
-                        const availH = heightPx - marginTop - marginBottom;
-                        const scale = Math.min(availW / sourceImg.width, availH / sourceImg.height);
-                        const x = marginLeft + (availW - sourceImg.width * scale) / 2;
-                        const y = marginTop + (availH - sourceImg.height * scale) / 2;
-                        ctx.drawImage(sourceImg, x, y, sourceImg.width * scale, sourceImg.height * scale);
-                        pdf.addImage(canvas.toDataURL('image/jpeg'), 'JPEG', 0, 0, widthCm, heightCm);
-                        progressBar.style.width = `${((i + 1) / allImages.length) * 100}%`;
-                        resolve();
+        document.getElementById('exportButton').addEventListener('click', async function() {
+            if (allImages.length === 0) return alert('请先选择图片！');
+            const { jsPDF } = window.jspdf;
+            const widthCm = parseFloat(document.getElementById('widthInput').value); const heightCm = parseFloat(document.getElementById('heightInput').value);
+            const dpi = parseInt(document.getElementById('dpiInput').value); const widthPx = cmToPx(widthCm, dpi); const heightPx = cmToPx(heightCm, dpi);
+            const marginTop = mmToPx(parseInt(document.getElementById('marginTopInput').value)||0); const marginBottom = mmToPx(parseInt(document.getElementById('marginBottomInput').value)||0);
+            const marginLeft = mmToPx(parseInt(document.getElementById('marginLeftInput').value)||0); const marginRight = mmToPx(parseInt(document.getElementById('marginRightInput').value)||0);
+            const pdf = new jsPDF({ orientation: widthCm > heightCm ? 'landscape' : 'portrait', unit: 'cm', format: [widthCm, heightCm] });
+            const progressBar = document.getElementById('progressBar'); document.getElementById('progressContainer').classList.add('show');
+            
+            for (let i = 0; i < allImages.length; i++) {
+                if (i > 0) pdf.addPage([widthCm, heightCm], widthCm > heightCm ? 'landscape' : 'portrait');
+                await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image(); img.src = e.target.result;
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas'); canvas.width = widthPx; canvas.height = heightPx;
+                            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            const sourceImg = getRotatedSource(img, allImages[i].rotation);
+                            const availW = widthPx - marginLeft - marginRight; const availH = heightPx - marginTop - marginBottom;
+                            const scale = Math.min(availW / sourceImg.width, availH / sourceImg.height);
+                            const x = marginLeft + (availW - sourceImg.width * scale) / 2; const y = marginTop + (availH - sourceImg.height * scale) / 2;
+                            ctx.drawImage(sourceImg, x, y, sourceImg.width * scale, sourceImg.height * scale);
+                            pdf.addImage(canvas.toDataURL('image/jpeg'), 'JPEG', 0, 0, widthCm, heightCm);
+                            progressBar.style.width = `${((i + 1) / allImages.length) * 100}%`; resolve();
+                        };
                     };
-                };
-                reader.readAsDataURL(allImages[i].file);
-            });
-        }
-        pdf.save('Crous_Export.pdf');
-        setTimeout(() => { progressBar.style.width = '0%'; document.getElementById('progressContainer').classList.remove('show'); }, 1000);
-    });
-
-    // ---------------- 智能画本逻辑 ----------------
-    let roleColors = {"旁白": "#555555"}, roleMapping = {}, pendingColorChanges = {};
-    const defaultDeepColors = ["#C62828", "#1565C0", "#2E7D32", "#5D4037", "#6A1B9A", "#004D40", "#BF360C", "#3E2723", "#880E4F", "#01579B", "#33691E", "#AD1457"];
-    function cleanRoleName(r){return r.trim().replace(/^【|】$/g,'').replace(/^「|」$/g,'').replace(/^"|"$/g,'').replace(/^“|”$/g,'').replace(/\s+/g,' ')}
-    function getRoleColor(r){const c=cleanRoleName(r);if(roleColors[c])return roleColors[c];const col=defaultDeepColors[Object.keys(roleColors).length%defaultDeepColors.length];roleColors[c]=col;return col;}
-    function updateLegend(){const l=document.getElementById("roleList");const rs=Object.keys(roleColors);l.innerHTML="";if(!rs.length)return l.innerHTML="<p>暂无角色</p>";rs.forEach(r=>{
-        const c=pendingColorChanges[r]!==undefined?pendingColorChanges[r]:(roleColors[r]||"#000");
-        const d=document.createElement("div");d.className="role-item";
-        d.innerHTML=`<input type="color" class="color-box" value="${c}" data-role="${r}"><div class="role-name">${r}</div><input type="text" class="color-input" value="${c}" maxlength="7"><div class="action-cell"><button class="btn-apply" onclick="applyColor('${r}')">应用</button></div>`;
-        l.appendChild(d);
-        d.querySelector(".color-box").oninput=function(){pendingColorChanges[r]=this.value;d.querySelector(".color-input").value=this.value};
-        d.querySelector(".color-input").oninput=function(){if(/^#[0-9A-F]{6}$/i.test(this.value)){pendingColorChanges[r]=this.value;d.querySelector(".color-box").value=this.value}};
-    })}
-    window.applyColor=function(r){if(pendingColorChanges[r]){roleColors[r]=pendingColorChanges[r];delete pendingColorChanges[r];rerenderOutput();updateLegend()}}
-    function rerenderOutput(){
-        const blocks=parseDialogue(document.getElementById("input").value);let html="";
-        for(const b of blocks){const t=b.content.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
-        if(b.type==='dialogue'){let r=cleanRoleName(b.role);if(roleMapping[r])r=roleMapping[r];html+=`<div style="color:${roleColors[r]||getRoleColor(r)};min-height:1.5em">${t}</div>`}else{html+=`<div style="min-height:1.5em">${t}</div>`}}
-        document.getElementById("output").innerHTML=html;
-    }
-    function parseDialogue(t){const ls=t.split('\n'),res=[];let i=0;while(i<ls.length){const l=ls[i].trim();if(!l){res.push({type:'text',content:""});i++;continue}let m=l.match(/^([【「"“]?[\u4e00-\u9fa5a-zA-Z0-9_\s]+?[】」"”]?)[：:\s　]+(.*)$/);if(m&&m[1].replace(/[【】「」"“”]/g,'').trim().length<=12){let c=[m[1]+'：'+m[2]];i++;while(i<ls.length&&/^\s/.test(ls[i])&&ls[i].trim()){c.push(ls[i]);i++}res.push({type:'dialogue',role:cleanRoleName(m[1]),content:c.join('\n')});continue}res.push({type:'text',content:ls[i]});i++}return res}
-    window.autoHighlight=function(){roleMapping={};pendingColorChanges={};roleColors={"旁白":"#555555"};rerenderOutput();updateLegend()}
-    window.manualHighlight=function(){const r=document.getElementById("roleInput").value.trim();if(!r)return alert("输入角色名");const s=window.getSelection();if(!s.rangeCount)return alert("选中文本");const rg=s.getRangeAt(0);const t=rg.toString();if(!t)return;const sp=document.createElement("span");sp.style.color=getRoleColor(r);sp.textContent=t;rg.deleteContents();rg.insertNode(sp);updateLegend()}
-    window.copyResult=function(){const r=document.createRange();r.selectNode(document.getElementById("output"));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");alert("已复制");window.getSelection().removeAllRanges()}
-    updateLegend();
-
-    // ---------------- 书库管理逻辑 ----------------
-    let libDB, currentRendition, currentPDF, currentBook, rootHandle, currentBookBuffer;
-    let wheelBusy = false;
-
-    let libPrefs = JSON.parse(localStorage.getItem('SomniaPrefs')) || {
-        mode: 'double',
-        fontSize: 18,
-        theme: 'default',
-        controls: { click: true, wheel: true, keys: true }
-    };
-
-    const pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-    const dbReqLib = indexedDB.open("SomniaLib_Stable_v2", 2);
-    dbReqLib.onupgradeneeded = e => {
-        libDB = e.target.result;
-        if (!libDB.objectStoreNames.contains("books")) libDB.createObjectStore("books", { keyPath: "path" });
-        if (!libDB.objectStoreNames.contains("config")) libDB.createObjectStore("config", { keyPath: "id" });
-    };
-    dbReqLib.onsuccess = e => { libDB = e.target.result; initLibrary(); };
-
-    function initLibrary() {
-        document.getElementById('libName').innerText = localStorage.getItem('libName') || "我的书库";
-        syncLibrarySettingsDOM();
-        renderGrid();
-        checkHandle();
-    }
-
-    function syncLibrarySettingsDOM() {
-        document.getElementById('check-click').checked = libPrefs.controls.click;
-        document.getElementById('check-wheel').checked = libPrefs.controls.wheel;
-        document.getElementById('check-keys').checked = libPrefs.controls.keys;
-        updateModeBtnUI();
-        setTheme(libPrefs.theme);
-    }
-
-    function updateSettings() {
-        libPrefs.controls.click = document.getElementById('check-click').checked;
-        libPrefs.controls.wheel = document.getElementById('check-wheel').checked;
-        libPrefs.controls.keys = document.getElementById('check-keys').checked;
-        saveLibPrefs();
-    }
-
-    function saveLibPrefs() { localStorage.setItem('SomniaPrefs', JSON.stringify(libPrefs)); }
-
-    function handleReaderClick(e) {
-        if (!libPrefs.controls.click) return;
-        if (document.querySelector('.slide-panel.active')) { togglePanel(null); return; }
-        const x = e.clientX, w = window.innerWidth;
-        if (x < w * 0.3) doPrev(); else if (x > w * 0.7) doNext();
-    }
-
-    function doNext() {
-        if (currentPDF) {
-            let step = (libPrefs.mode === 'double' && currentBook.lastPage > 1) ? 2 : 1;
-            if (currentBook.lastPage + step <= currentPDF.numPages) {
-                currentBook.lastPage += step;
-                renderPDF(currentBook.lastPage);
-            }
-        } else currentRendition?.next();
-    }
-
-    function doPrev() {
-        if (currentPDF) {
-            let step = (libPrefs.mode === 'double' && currentBook.lastPage > 2) ? 2 : 1;
-            if (currentBook.lastPage - step >= 1) {
-                currentBook.lastPage -= step;
-                renderPDF(currentBook.lastPage);
-            }
-        } else currentRendition?.prev();
-    }
-
-    window.onwheel = e => {
-        if (!libPrefs.controls.wheel || document.getElementById('viewer-main').style.display !== 'flex' || wheelBusy) return;
-        wheelBusy = true;
-        if (e.deltaY > 0) doNext(); else doPrev();
-        setTimeout(() => { wheelBusy = false; }, 500);
-    };
-
-    window.onkeydown = e => {
-        if (!libPrefs.controls.keys || document.getElementById('viewer-main').style.display === 'none') return;
-        if (e.key === 'ArrowRight' || e.key === ' ') doNext();
-        if (e.key === 'ArrowLeft') doPrev();
-        if (e.key === 'Escape') closeViewer();
-    };
-
-    async function renderPDF(num) {
-        const viewer = document.getElementById('pdf-viewer');
-        viewer.innerHTML = '';
-        
-        const isDouble = libPrefs.mode === 'double' && num > 1;
-        const scale = window.innerWidth < 1024 ? (isDouble ? 0.6 : 0.9) : (isDouble ? 1.0 : 1.5);
-
-        const container = document.createElement('div');
-        container.className = isDouble ? "flex gap-8 justify-center items-start p-4" : "flex justify-center p-4";
-        viewer.appendChild(container);
-
-        await renderSinglePDFPage(num, container, scale);
-
-        if (isDouble && num + 1 <= currentPDF.numPages) {
-            await renderSinglePDFPage(num + 1, container, scale);
-        }
-
-        const displayPage = isDouble ? `${num}-${Math.min(num+1, currentPDF.numPages)}` : num;
-        document.getElementById('progTag').innerText = `${displayPage} / ${currentPDF.numPages}`;
-        updateProgress((num/currentPDF.numPages)*100, {lastPage: num});
-    }
-
-    async function renderSinglePDFPage(pageNum, parent, scale) {
-        const page = await currentPDF.getPage(pageNum);
-        const canvas = document.createElement('canvas');
-        canvas.className = "shadow-2xl my-4 bg-white transition-opacity duration-500 opacity-0";
-        const ctx = canvas.getContext('2d');
-        const viewport = page.getViewport({scale});
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        parent.appendChild(canvas);
-        await page.render({canvasContext: ctx, viewport}).promise;
-        canvas.style.opacity = "1";
-    }
-
-    async function initEpub(data, cfi) {
-        const viewer = document.getElementById('epub-viewer');
-        viewer.innerHTML = '';
-        const book = ePub(data);
-        await book.opened;
-        
-        const toc = await book.navigation.toc;
-        const panel = document.getElementById('toc-panel');
-        panel.innerHTML = '<div class="p-6 font-bold text-gray-300 uppercase tracking-widest text-[10px] bg-gray-50/50">Table of Contents</div>';
-        const renderToc = (items) => {
-            items.forEach(t => {
-                const a = document.createElement('div'); a.className = 'toc-link'; a.innerText = t.label;
-                a.onclick = (ev) => { ev.stopPropagation(); currentRendition.display(t.href); togglePanel(null); };
-                panel.appendChild(a);
-                if(t.subitems) renderToc(t.subitems);
-            });
-        };
-        renderToc(toc);
-
-        currentRendition = book.renderTo("epub-viewer", {
-            width: "100%", height: "100%", flow: "paginated", manager: "default",
-            spread: libPrefs.mode === 'double' ? 'always' : 'none', allowScriptedContent: true
-        });
-
-        currentRendition.on('rendered', (section, view) => {
-            const doc = view.document;
-            doc.addEventListener('click', e => handleReaderClick(e));
-            doc.addEventListener('keydown', e => {
-                if(!libPrefs.controls.keys) return;
-                if(e.key === 'ArrowRight' || e.key === ' ') doNext();
-                if(e.key === 'ArrowLeft') doPrev();
-            });
-        });
-
-        currentRendition.on("relocated", loc => {
-            const p = (book.locations.percentageFromCfi(loc.start.cfi) * 100).toFixed(1);
-            document.getElementById('progTag').innerText = p + '%';
-            updateProgress(parseFloat(p), {cfi: loc.start.cfi});
-        });
-
-        book.locations.generate(1000);
-        await book.ready;
-        try { await currentRendition.display(cfi || undefined); } catch(e) { await currentRendition.display(); }
-        applyEPUBPrefs();
-        setTimeout(() => currentRendition.resize(), 500);
-    }
-
-    function setTheme(t) {
-        libPrefs.theme = t;
-        const themes = {
-            default: { bg: '#ffffff', text: '#1d1d1f' },
-            almond: { bg: 'rgb(250, 249, 222)', text: '#3e392d' },
-            green: { bg: 'rgb(204, 232, 207)', text: '#2e3a2e' },
-            gray: { bg: 'rgb(234, 234, 239)', text: '#2d2d3a' },
-            night: { bg: 'rgb(30, 30, 35)', text: '#d1d1d6' }
-        };
-        const active = themes[t];
-        document.getElementById('render-area').style.backgroundColor = active.bg;
-        document.getElementById('pdf-viewer').style.backgroundColor = active.bg;
-        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('t-' + t).classList.add('active');
-        if(currentRendition) applyEPUBPrefs();
-        saveLibPrefs();
-    }
-
-    function applyEPUBPrefs() {
-        if(!currentRendition) return;
-        const theme = {
-            default: { bg: '#ffffff', text: '#1d1d1f' },
-            almond: { bg: 'rgb(250, 249, 222)', text: '#3e392d' },
-            green: { bg: 'rgb(204, 232, 207)', text: '#2e3a2e' },
-            gray: { bg: 'rgb(234, 234, 239)', text: '#2d2d3a' },
-            night: { bg: 'rgb(30, 30, 35)', text: '#d1d1d6' }
-        }[libPrefs.theme];
-        currentRendition.themes.register('custom', { body: { color: theme.text + ' !important', background: theme.bg + ' !important' }});
-        currentRendition.themes.select('custom');
-    }
-
-    function updateMode(m) {
-        libPrefs.mode = m; updateModeBtnUI(); saveLibPrefs();
-        if(currentBook.type === 'PDF') renderPDF(currentBook.lastPage);
-        else initEpub(currentBookBuffer, currentRendition?.location?.start?.cfi);
-    }
-
-    function updateModeBtnUI() {
-        const isD = libPrefs.mode === 'double';
-        document.getElementById('mode-double').className = isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400';
-        document.getElementById('mode-single').className = !isD ? 'flex-1 py-2 text-xs rounded-lg bg-white shadow-sm font-bold text-blue-600' : 'flex-1 py-2 text-xs text-gray-400';
-    }
-
-    async function openReader(book) {
-        currentBook = book;
-        document.getElementById('viewer-main').style.display = 'flex';
-        document.getElementById('readerTitle').innerText = book.title;
-        if(await book.handle.queryPermission({mode:'read'}) !== 'granted') await book.handle.requestPermission({mode:'read'});
-        const file = await book.handle.getFile();
-        currentBookBuffer = await file.arrayBuffer();
-        if(book.type === 'PDF') {
-            document.getElementById('pdf-viewer').classList.remove('hidden');
-            document.getElementById('epub-viewer').classList.add('hidden');
-            currentRendition = null; currentPDF = await pdfjsLib.getDocument(currentBookBuffer).promise;
-            renderPDF(book.lastPage || 1);
-        } else {
-            document.getElementById('epub-viewer').classList.remove('hidden');
-            document.getElementById('pdf-viewer').classList.add('hidden');
-            currentPDF = null; initEpub(currentBookBuffer, book.cfi);
-        }
-    }
-
-    function renderGrid(filter = 'all') {
-        if (!libDB) return;
-        const grid = document.getElementById('libraryGrid'); grid.innerHTML = '';
-        const dirs = new Set(); const all = [];
-        const tx = libDB.transaction("books", "readonly");
-        tx.objectStore("books").openCursor().onsuccess = e => {
-            const c = e.target.result;
-            if(c) { all.push(c.value); c.continue(); }
-            else {
-                all.sort((a,b) => (b.progress||0) - (a.progress||0)).forEach(b => {
-                    dirs.add(b.folder);
-                    if(filter === 'all' || b.folder === filter) {
-                        const isDone = b.progress >= 99.5;
-                        const div = document.createElement('div'); div.className = "book-card flex flex-col cursor-pointer";
-                        div.onclick = () => openReader(b);
-                        div.innerHTML = `<div class="relative mb-3"><img src="${b.cover||''}" class="w-full shadow-md"><div class="absolute bottom-2 right-2 ${isDone?'bg-green-500':'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-lg">${isDone?'已阅读':(b.progress||0).toFixed(0)+'%'}</div></div><h3 class="text-[11px] font-bold text-gray-700 line-clamp-2 px-1 leading-tight">${b.title}</h3>`;
-                        grid.appendChild(div);
-                    }
+                    reader.readAsDataURL(allImages[i].file);
                 });
-                document.getElementById('dirList').innerHTML = Array.from(dirs).map(d => `<button onclick="renderGrid('${d}')" class="w-full text-left px-4 py-3 text-[10px] text-gray-400 hover:text-blue-600 font-bold uppercase truncate transition"><i class="fas fa-folder mr-3 opacity-20"></i>${d}</button>`).join('');
             }
-        }
-    }
-
-    function togglePanel(id) { ['toc-panel', 'settings-panel'].forEach(p => { if(p === id) document.getElementById(p).classList.toggle('active'); else document.getElementById(p).classList.remove('active'); }); }
-    function closeViewer() { document.getElementById('viewer-main').style.display = 'none'; renderGrid(); }
-    async function checkHandle() { libDB.transaction("config", "readonly").objectStore("config").get("root").onsuccess = e => { if(e.target.result) { rootHandle = e.target.result.handle; document.getElementById('relinkBtn')?.classList.remove('hidden'); } }; }
-    async function relink() { if(await rootHandle.requestPermission({mode:'read'}) === 'granted') { document.getElementById('relinkBtn').classList.add('hidden'); renderGrid(); } }
-    async function startScan() {
-        rootHandle = await window.showDirectoryPicker();
-        libDB.transaction("config", "readwrite").objectStore("config").put({id: "root", handle: rootHandle});
-        document.getElementById('scanOverlay').classList.remove('hidden');
-        let files = [];
-        async function walk(h, p) {
-            for await (const e of h.values()) {
-                const rel = p ? `${p}/${e.name}` : e.name;
-                if(e.kind === 'file' && ['pdf','epub'].includes(e.name.split('.').pop().toLowerCase())) files.push({h: e, p: rel});
-                else if(e.kind === 'directory') await walk(e, rel);
-            }
-        }
-        await walk(rootHandle, "");
-        for(let i=0; i<files.length; i++){
-            document.getElementById('scanBar').style.width = ((i+1)/files.length)*100 + '%';
-            await saveBook(files[i].h, files[i].p);
-        }
-        document.getElementById('scanOverlay').classList.add('hidden');
-        renderGrid();
-    }
-    async function saveBook(handle, path) {
-        const tx = libDB.transaction("books", "readwrite");
-        const existing = await new Promise(r => { tx.objectStore("books").get(path).onsuccess = e => r(e.target.result); });
-        if(existing && existing.cover) return;
-        const file = await handle.getFile();
-        const buffer = await file.arrayBuffer();
-        let cover = "";
-        try {
-            if(path.endsWith('.epub')) {
-                const book = ePub(buffer);
-                const url = await book.coverUrl();
-                const res = await fetch(url);
-                cover = await new Promise(r => { const reader = new FileReader(); reader.onloadend = () => r(reader.result); reader.readAsDataURL(res); });
-            } else {
-                const pdf = await pdfjsLib.getDocument(buffer).promise;
-                const page = await pdf.getPage(1);
-                const canvas = document.createElement('canvas');
-                const viewport = page.getViewport({scale: 0.3});
-                canvas.width = viewport.width; canvas.height = viewport.height;
-                await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
-                cover = canvas.toDataURL("image/jpeg", 0.6);
-                pdf.destroy();
-            }
-        } catch(e) {}
-        const txWrite = libDB.transaction("books", "readwrite");
-        txWrite.objectStore("books").put({
-            title: handle.name, path, handle, cover, progress: existing ? existing.progress : 0, lastPage: existing ? existing.lastPage : 1,
-            type: path.endsWith('.pdf') ? 'PDF' : 'EPUB', folder: path.includes('/') ? path.split('/')[0] : '根目录'
+            pdf.save('Crous_Export.pdf');
+            setTimeout(() => { progressBar.style.width = '0%'; document.getElementById('progressContainer').classList.remove('show'); }, 1000);
         });
-    }
-    function updateProgress(p, ex) {
-        const tx = libDB.transaction("books", "readwrite");
-        const store = tx.objectStore("books");
-        store.get(currentBook.path).onsuccess = e => {
-            const b = e.target.result;
-            if(b) { b.progress = p; Object.assign(b, ex); store.put(b); }
+
+        // ==========================================
+        // HB1.6 智能画本核心逻辑
+        // ==========================================
+        let roleColors = {"旁白": "#555555"}, roleMapping = {}, pendingColorChanges = {};
+        const defaultDeepColors = ["#C62828", "#1565C0", "#2E7D32", "#5D4037", "#6A1B9A", "#004D40", "#BF360C", "#3E2723", "#880E4F", "#01579B", "#33691E", "#AD1457"];
+        function cleanRoleName(r){return r.trim().replace(/^【|】$/g,'').replace(/^「|」$/g,'').replace(/^"|"$/g,'').replace(/^“|”$/g,'').replace(/\s+/g,' ')}
+        function getRoleColor(r){const c=cleanRoleName(r);if(roleColors[c])return roleColors[c];const col=defaultDeepColors[Object.keys(roleColors).length%defaultDeepColors.length];roleColors[c]=col;return col;}
+        function updateLegend(){const l=document.getElementById("roleList");const rs=Object.keys(roleColors);l.innerHTML="";if(!rs.length)return l.innerHTML="<p>暂无角色</p>";rs.forEach(r=>{
+            const c=pendingColorChanges[r]!==undefined?pendingColorChanges[r]:(roleColors[r]||"#000");
+            const d=document.createElement("div");d.className="role-item";
+            d.innerHTML=`<input type="color" class="color-box" value="${c}" data-role="${r}"><div class="role-name ml-3 flex-1">${r}</div><input type="text" class="color-input w-20 px-2 py-1 text-xs border rounded-lg mr-2" value="${c}" maxlength="7"><button class="btn-apply" onclick="applyColor('${r}')">应用</button>`;
+            l.appendChild(d);
+            d.querySelector(".color-box").oninput=function(){pendingColorChanges[r]=this.value;d.querySelector(".color-input").value=this.value};
+            d.querySelector(".color-input").oninput=function(){if(/^#[0-9A-F]{6}$/i.test(this.value)){pendingColorChanges[r]=this.value;d.querySelector(".color-box").value=this.value}};
+        })}
+        window.applyColor=function(r){if(pendingColorChanges[r]){roleColors[r]=pendingColorChanges[r];delete pendingColorChanges[r];rerenderOutput();updateLegend()}}
+        function rerenderOutput(){
+            const blocks=parseDialogue(document.getElementById("input").value);let html="";
+            for(const b of blocks){const t=b.content.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+            if(b.type==='dialogue'){let r=cleanRoleName(b.role);if(roleMapping[r])r=roleMapping[r];html+=`<div style="color:${roleColors[r]||getRoleColor(r)};min-height:1.5em">${t}</div>`}else{html+=`<div style="min-height:1.5em">${t}</div>`}}
+            document.getElementById("output").innerHTML=html;
         }
-    }
-    function clearCache() { if(confirm("重置数据？")){ indexedDB.deleteDatabase("SomniaLib_Stable_v2"); location.reload(); }}
-    function handleRename() { const n = prompt("重命名书库:", document.getElementById('libName').innerText); if(n) { document.getElementById('libName').innerText = n; localStorage.setItem('libName', n); } }
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        function parseDialogue(t){const ls=t.split('\n'),res=[];let i=0;while(i<ls.length){const l=ls[i].trim();if(!l){res.push({type:'text',content:""});i++;continue}let m=l.match(/^([【「"“]?[\u4e00-\u9fa5a-zA-Z0-9_\s]+?[】」"”]?)[：:\s　]+(.*)$/);if(m&&m[1].replace(/[【】「」"“”]/g,'').trim().length<=12){let c=[m[1]+'：'+m[2]];i++;while(i<ls.length&&/^\s/.test(ls[i])&&ls[i].trim()){c.push(ls[i]);i++}res.push({type:'dialogue',role:cleanRoleName(m[1]),content:c.join('\n')});continue}res.push({type:'text',content:ls[i]});i++}return res}
+        window.autoHighlight=function(){roleMapping={};pendingColorChanges={};roleColors={"旁白":"#555555"};rerenderOutput();updateLegend()}
+        window.manualHighlight=function(){const r=document.getElementById("roleInput").value.trim();if(!r)return alert("输入角色名");const s=window.getSelection();if(!s.rangeCount)return alert("选中文本");const rg=s.getRangeAt(0);const t=rg.toString();if(!t)return;const sp=document.createElement("span");sp.style.color=getRoleColor(r);sp.textContent=t;rg.deleteContents();rg.insertNode(sp);updateLegend()}
+        window.copyResult=function(){const r=document.createRange();r.selectNode(document.getElementById("output"));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");alert("已复制");window.getSelection().removeAllRanges()}
+        updateLegend();
+
+    </script>
 </body>
 </html>
-
