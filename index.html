@@ -38,7 +38,7 @@
         #md-viewer h1 { font-size: 2em; font-weight: bold; margin-bottom: 1em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
         #md-viewer blockquote { border-left: 4px solid #3b82f6; padding-left: 1em; color: #666; background: #f8fafc; padding: 10px; border-radius: 4px; }
         
-        .flip-zone { position: absolute; top: 56px; bottom: 0; width: 40px; z-index: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; color: #2563eb; transition: 0.3s; }
+        .flip-zone { position: absolute; top: 56px; bottom: 0; width: 50px; z-index: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; color: #2563eb; transition: 0.3s; }
         .flip-zone:hover { opacity: 1; background: rgba(37, 99, 235, 0.05); }
         .flip-left { left: 0; } .flip-right { right: 0; } 
 
@@ -473,6 +473,40 @@
         let db, currentRendition, currentPDF, currentBook, rootHandle, currentBookBuffer;
         let wheelBusy = false, globalTags = new Set();
         let tempEpubSelection = null;
+        // --- 新增：移动端触摸滑动翻页核心逻辑 ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const SWIPE_THRESHOLD = 50; // 触发滑动的最小滑动距离(像素)
+
+        function handleTouchStart(e) {
+            // 忽略多指触控（防止缩放操作误触）
+            if (e.touches.length > 1) return; 
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }
+
+        function handleTouchEnd(e) {
+            if (e.changedTouches.length > 1) return;
+            if (document.getElementById('viewer-main').style.display !== 'flex') return;
+
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+
+            // 判断是否为水平滑动（X轴位移大于Y轴位移，且超过阈值）
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > SWIPE_THRESHOLD) {
+                // 如果侧边栏处于打开状态，不触发翻页
+                if (document.querySelector('.slide-panel.active')) return; 
+
+                if (diffX > 0) {
+                    doPrev(); // 向右滑，上一页
+                } else {
+                    doNext(); // 向左滑，下一页
+                }
+            }
+        }
+        // ----------------------------------------
 
         const pdfjs = window['pdfjs-dist/build/pdf'];
         pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -494,6 +528,11 @@
             document.getElementById('libName').innerText = localStorage.getItem('libName') || "我的书库";
             switchMainView('library');
             checkHandle(); setTimeout(syncSettingsDOM, 300);
+
+            // --- 新增：为主渲染区绑定滑动事件 ---
+            const renderArea = document.getElementById('render-area');
+            renderArea.addEventListener('touchstart', handleTouchStart, { passive: true });
+            renderArea.addEventListener('touchend', handleTouchEnd, { passive: true });
         }
 
         function triggerScan() {
@@ -716,6 +755,11 @@
                 view.document.addEventListener('keydown', handleGlobalKey); 
                 view.document.addEventListener('click', (e) => { const sel = view.document.getSelection(); if(sel && sel.toString().trim().length > 0) return; handleAreaClick(); hideHighlightTriggers(); }); 
                 view.document.addEventListener('contextmenu', e => { const sel = view.document.getSelection(); if(sel && sel.toString().trim().length > 0 && tempEpubSelection) { e.preventDefault(); executeHighlight(); } });
+                
+                // --- 新增：为 EPUB 内部绑定滑动事件 ---
+                view.document.addEventListener('touchstart', handleTouchStart, { passive: true });
+                view.document.addEventListener('touchend', handleTouchEnd, { passive: true });
+                // -------------------------------------
             });
             currentRendition.on("relocated", loc => { const p = book.locations.percentageFromCfi(loc.start.cfi); const dp = (p && p > 0) ? (p * 100).toFixed(1) : (Number(currentBook.progress) || 0).toFixed(1); document.getElementById('progTag').innerText = dp + '%'; window.updateProgress(parseFloat(dp), {cfi: loc.start.cfi}); });
             (currentBook.notes || []).forEach(n => { if(n.type==='epub' || !n.type) currentRendition.annotations.add("highlight", n.loc || n.cfi, {}, (e)=>{}); });
