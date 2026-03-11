@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Somnia Library Pro - Stable v3.4 (含Crous工具集)</title>
+    <title>Somnia Library Pro - Stable v3.4 (跨平台兼容版)</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -160,7 +160,10 @@
             <div id="dirList" class="space-y-1"></div>
         </nav>
         <div class="p-4 border-t border-gray-100">
-            <button onclick="startScan()" class="w-full py-3 bg-blue-600 text-white rounded-2xl text-xs font-bold shadow-lg mb-2">扫描文件夹</button>
+            <button onclick="triggerScan()" class="w-full py-3 bg-blue-600 text-white rounded-2xl text-xs font-bold shadow-lg mb-2 flex justify-center items-center"><i class="fas fa-folder-plus mr-2"></i> 添加 / 扫描书籍</button>
+            <input type="file" id="fallbackDirInput" webkitdirectory directory multiple accept=".epub,.pdf,.txt,.md" class="hidden" onchange="handleFallbackImport(event)">
+            <input type="file" id="fallbackFileInput" multiple accept=".epub,.pdf,.txt,.md" class="hidden" onchange="handleFallbackImport(event)">
+            
             <div class="grid grid-cols-2 gap-2">
                 <button onclick="exportIndexOnly()" class="py-2 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-bold">导出索引</button>
                 <button onclick="document.getElementById('importInput').click()" class="py-2 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-bold">导入索引</button>
@@ -372,9 +375,6 @@
     </div>
 
     <script>
-        // ==========================================
-        // 核心视图切换逻辑 (新增)
-        // ==========================================
         function switchMainView(view) {
             document.getElementById('view-library').style.display = 'none';
             document.getElementById('view-crousimg').style.display = 'none';
@@ -401,9 +401,6 @@
             }
         }
 
-        // ==========================================
-        // Clib_v34 原版逻辑
-        // ==========================================
         let db, currentRendition, currentPDF, currentBook, rootHandle, currentBookBuffer;
         let wheelBusy = false, globalTags = new Set();
         let tempEpubSelection = null;
@@ -426,8 +423,116 @@
 
         function initProgram() {
             document.getElementById('libName').innerText = localStorage.getItem('libName') || "我的书库";
-            switchMainView('library'); // 默认进入全部藏书
+            switchMainView('library');
             checkHandle(); setTimeout(syncSettingsDOM, 300);
+        }
+
+        function triggerScan() {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            const hasFSA = 'showDirectoryPicker' in window;
+
+            if (hasFSA && !isMobile) {
+                startScan(); 
+            } else if (!isMobile) {
+                document.getElementById('fallbackDirInput').click(); 
+            } else {
+                document.getElementById('fallbackFileInput').click(); 
+            }
+        }
+
+        async function handleFallbackImport(event) {
+            const files = Array.from(event.target.files).filter(f => {
+                const ext = f.name.split('.').pop().toLowerCase();
+                return ['pdf','epub','txt','md'].includes(ext);
+            });
+            if (!files.length) return;
+            
+            document.getElementById('scanOverlay').classList.remove('hidden');
+            document.getElementById('scanText').innerText = "Importing Books...";
+            
+            for(let i=0; i<files.length; i++) {
+                document.getElementById('scanBar').style.width = ((i+1)/files.length*100)+'%';
+                await new Promise(r => setTimeout(r, 20)); 
+                try {
+                    await saveBookBlob(files[i]);
+                } catch(err) { console.error("Import error:", err); }
+            }
+            
+            document.getElementById('scanOverlay').classList.add('hidden');
+            document.getElementById('scanText').innerText = "Syncing Library..."; 
+            renderGrid();
+            event.target.value = ''; 
+        }
+
+        async function saveBookBlob(file) {
+            const p = file.webkitRelativePath || file.name;
+            const folderName = p.includes('/') ? p.split('/')[0] : '导入书籍';
+            
+            const txR = db.transaction("books","readonly");
+            const ex = await new Promise(r => { txR.objectStore("books").get(p).onsuccess=e=>r(e.target.result); });
+            
+            let cover = "";
+            if (ex && ex.cover) {
+                cover = ex.cover;
+            } else {
+                try {
+                    const buf = await file.arrayBuffer();
+                    cover = await extractCover(buf, p);
+                } catch(e) {}
+            }
+            
+            db.transaction("books","readwrite").objectStore("books").put({
+                title: file.name,
+                path: p,
+                blob: file, 
+                cover: cover,
+                progress: ex ? Number(ex.progress) : 0,
+                lastPage: ex ? ex.lastPage : 1,
+                notes: ex ? ex.notes : [],
+                type: p.split('.').pop().toUpperCase(),
+                folder: folderName,
+                tags: ex ? ex.tags : []
+            });
+        }
+
+        async function openReader(book) {
+            currentBook = book; 
+            document.getElementById('viewer-main').style.display = 'flex'; 
+            document.getElementById('readerTitle').innerText = book.title; 
+            renderBookTags(); 
+            renderNotesPanel(); 
+
+            // --- 核心修复：隐藏/显示侧边翻页区，防止遮挡 TXT/MD 滚动条 ---
+            const ext = book.path.split('.').pop().toLowerCase();
+            const flipZones = document.querySelectorAll('.flip-zone');
+            if (ext === 'txt' || ext === 'md') {
+                flipZones.forEach(z => z.style.display = 'none');
+            } else {
+                flipZones.forEach(z => z.style.display = 'flex');
+            }
+            // -------------------------------------------------------------
+
+            try {
+                if (book.handle) {
+                    if(await book.handle.queryPermission() !== 'granted') await book.handle.requestPermission(); 
+                    currentBookBuffer = await (await book.handle.getFile()).arrayBuffer(); 
+                } else if (book.blob) {
+                    currentBookBuffer = await book.blob.arrayBuffer();
+                } else {
+                    alert("无法读取书籍文件，请尝试重新导入。");
+                    closeViewer();
+                    return;
+                }
+            } catch(e) {
+                alert("读取失败，可能浏览器缓存已被清理。请重新导入该书籍。");
+                closeViewer();
+                return;
+            }
+
+            if(ext === 'pdf') { currentPDF = await pdfjs.getDocument(currentBookBuffer).promise; renderPDF(book.lastPage || 1); } 
+            else if(ext === 'txt') { initTxt(currentBookBuffer); } 
+            else if(ext === 'md') { initMd(currentBookBuffer); } 
+            else { initEpub(currentBookBuffer, book.cfi); } 
         }
 
         function initHighlighting() {
@@ -562,9 +667,16 @@
             } catch(e) {}
         }
 
+        // --- 核心修复：精准的 GBK 降级检测 ---
         function initMd(buf) {
             const v = document.getElementById('md-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('txt-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
-            let text = new TextDecoder('utf-8').decode(buf); if(text.includes('')) text = new TextDecoder('gbk').decode(buf);
+            
+            let text = new TextDecoder('utf-8').decode(buf); 
+            // 如果包含 Unicode 替换字符 \uFFFD，说明 UTF-8 解码失败，强制降级 GBK
+            if(text.includes('\uFFFD')) {
+                text = new TextDecoder('gbk').decode(buf);
+            }
+            
             v.innerHTML = marked.parse(text); v.scrollTop = 0; applyThemeStyles();
             setTimeout(() => { v.scrollTop = (currentBook.txtPos || 0) * v.scrollHeight; }, 100);
             v.onscroll = () => { const pos = v.scrollTop / v.scrollHeight; window.updateProgress(pos*100, { txtPos: pos }); document.getElementById('progTag').innerText = (pos * 100).toFixed(1) + '%'; };
@@ -572,11 +684,18 @@
 
         function initTxt(buf) {
             const v = document.getElementById('txt-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('md-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
-            let text = new TextDecoder('utf-8').decode(buf); if(text.includes('')) text = new TextDecoder('gbk').decode(buf);
+            
+            let text = new TextDecoder('utf-8').decode(buf); 
+            // 同样增加精准降级判断
+            if(text.includes('\uFFFD')) {
+                text = new TextDecoder('gbk').decode(buf);
+            }
+            
             v.innerText = text; v.scrollTop = 0; applyThemeStyles();
             setTimeout(() => { v.scrollTop = (currentBook.txtPos || 0) * v.scrollHeight; }, 100);
             v.onscroll = () => { const pos = v.scrollTop / v.scrollHeight; window.updateProgress(pos*100, { txtPos: pos }); document.getElementById('progTag').innerText = (pos * 100).toFixed(1) + '%'; };
         }
+        // ------------------------------------
 
         async function extractCover(buf, path) { return new Promise(async (resolve) => { try { if (path.endsWith('.epub')) { const book = ePub(buf); const url = await book.coverUrl(); if (url) { const res = await fetch(url); const blob = await res.blob(); const rd = new FileReader(); rd.onloadend = () => { book.destroy(); resolve(rd.result); }; rd.readAsDataURL(blob); } else { book.destroy(); resolve(""); } } else if (path.endsWith('.pdf')) { const pdf = await pdfjs.getDocument(buf).promise; const page = await pdf.getPage(1); const cv = document.createElement('canvas'); const vp = page.getViewport({ scale: 0.3 }); cv.width = vp.width; cv.height = vp.height; await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise; const data = cv.toDataURL("image/jpeg", 0.6); pdf.destroy(); resolve(data); } else resolve(""); } catch (e) { resolve(""); } }); }
         
@@ -584,7 +703,6 @@
         async function saveBook(h, p) { const txR = db.transaction("books","readonly"); const ex = await new Promise(r => { txR.objectStore("books").get(p).onsuccess=e=>r(e.target.result); }); let cover = ""; if (ex && ex.cover) { cover = ex.cover; } else { try { const file = await h.getFile(); const buf = await file.arrayBuffer(); cover = await extractCover(buf, p); } catch(e) { } } db.transaction("books","readwrite").objectStore("books").put({ title:h.name, path:p, handle:h, cover, progress:ex?Number(ex.progress):0, lastPage:ex?ex.lastPage:1, notes:ex?ex.notes:[], type:p.split('.').pop().toUpperCase(), folder:p.includes('/')?p.split('/')[0]:'根目录', tags:ex?ex.tags:[] }); }
         
         function renderGrid(filter = 'all') { if(!db) return; const grid = document.getElementById('libraryGrid'); grid.innerHTML = ''; const dirs = new Set(), tags = new Set(), all = []; db.transaction("books", "readonly").objectStore("books").openCursor().onsuccess = e => { const c = e.target.result; if(c) { all.push(c.value); (c.value.tags || []).forEach(t => { tags.add(t); globalTags.add(t); }); dirs.add(c.value.folder); c.continue(); } else { all.sort((a,b) => (Number(b.progress)||0) - (Number(a.progress)||0)).forEach(b => { if(filter === 'all' || b.folder === filter || (b.tags && b.tags.includes(filter))) { const p = Number(b.progress) || 0; const div = document.createElement('div'); div.className = "book-card flex flex-col cursor-pointer"; div.onclick = () => openReader(b); let cvHTML = b.cover ? `<img src="${b.cover}" class="w-full h-full object-cover">` : `<div class="no-cover-label">${b.title}</div>`; div.innerHTML = `<div class="cover-box mb-3">${cvHTML}<div class="absolute bottom-2 right-2 ${p>=99.5?'bg-green-500':'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-lg">${p>=99.5?'已阅读':p.toFixed(0)+'%'}</div></div><h3 class="text-[11px] font-bold text-gray-700 line-clamp-2 px-1 leading-tight">${b.title}</h3>`; grid.appendChild(div); } }); document.getElementById('tagList').innerHTML = Array.from(tags).map(t => `<span onclick="renderGrid('${t}')" class="tag-pill">${t}</span>`).join(''); document.getElementById('dirList').innerHTML = Array.from(dirs).map(d => `<button onclick="renderGrid('${d}')" class="w-full text-left px-4 py-2 text-[10px] text-gray-400 hover:text-blue-600 font-bold truncate">📁 ${d}</button>`).join(''); updateSuggestedTagsUI(); } }; }
-        async function openReader(book) { currentBook = book; document.getElementById('viewer-main').style.display = 'flex'; document.getElementById('readerTitle').innerText = book.title; renderBookTags(); renderNotesPanel(); if(await book.handle.queryPermission() !== 'granted') await book.handle.requestPermission(); currentBookBuffer = await (await book.handle.getFile()).arrayBuffer(); const ext = book.path.split('.').pop().toLowerCase(); if(ext === 'pdf') { currentPDF = await pdfjs.getDocument(currentBookBuffer).promise; renderPDF(book.lastPage || 1); } else if(ext === 'txt') { initTxt(currentBookBuffer); } else if(ext === 'md') { initMd(currentBookBuffer); } else { initEpub(currentBookBuffer, book.cfi); } }
         
         window.updateProgress = (p, ex) => { if(!currentBook) return; const tx = db.transaction("books","readwrite"); tx.objectStore("books").get(currentBook.path).onsuccess = e => { const b = e.target.result; if(b){ b.progress = Number(p); Object.assign(b, ex); tx.objectStore("books").put(b); } }; };
         window.updateMode = (m) => { let lastCfi = currentRendition ? currentRendition.currentLocation()?.start?.cfi : null; prefs.mode = m; updateModeBtnUI(); savePrefs(); if (currentBook.type === 'EPUB') initEpub(currentBookBuffer, lastCfi); else if (currentBook.type === 'PDF') renderPDF(currentBook.lastPage); };
