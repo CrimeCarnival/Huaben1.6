@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Somnia Library Pro - Stable v3.4 (跨平台兼容版)</title>
+    <title>CrousLibrary Pro - Stable v3.4 (跨平台兼容器)</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -16,11 +16,14 @@
         
         /* ---------------- Clib 原生样式 ---------------- */
         body { font-family: 'Inter', sans-serif; background-color: #f5f5f7; overflow: hidden; height: 100vh; color: #1d1d1f; }
-        .sidebar { width: 260px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(20px); border-right: 1px solid rgba(0,0,0,0.05); }
+        
+        /* 侧边栏移动端适配 */
+        .sidebar { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-right: 1px solid rgba(0,0,0,0.05); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 280px; }
+        
         .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 1.5rem; padding: 1.5rem; }
         
         #viewer-main { position: fixed; inset: 0; background: white; z-index: 1000; display: none; flex-direction: column; }
-        .slide-panel { position: absolute; top: 56px; width: 300px; height: calc(100% - 56px); background: white; box-shadow: -15px 0 30px rgba(0,0,0,0.05); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1100; overflow-y: auto; }
+        .slide-panel { position: absolute; top: 56px; width: 300px; max-width: 85vw; height: calc(100% - 56px); background: white; box-shadow: -15px 0 30px rgba(0,0,0,0.05); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1100; overflow-y: auto; }
         #toc-panel { left: -300px; border-right: 1px solid #eee; box-shadow: 15px 0 30px rgba(0,0,0,0.05); }
         #toc-panel.active { left: 0; }
         #settings-panel { right: -300px; border-left: 1px solid #eee; }
@@ -30,7 +33,7 @@
 
         #render-area { flex: 1; width: 100%; height: 100%; position: relative; overflow: hidden; }
         #epub-viewer, #pdf-viewer { width: 100%; height: 100%; }
-        #txt-viewer, #md-viewer { width: 100%; height: 100%; padding: 40px 15%; overflow-y: auto; line-height: 1.8; font-size: 18px; white-space: pre-wrap; display: none; word-break: break-all; }
+        #txt-viewer, #md-viewer { width: 100%; height: 100%; padding: 40px 10%; overflow-y: auto; line-height: 1.8; font-size: 18px; white-space: pre-wrap; display: none; word-break: break-all; }
         #md-viewer { white-space: normal; }
         #md-viewer h1 { font-size: 2em; font-weight: bold; margin-bottom: 1em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
         #md-viewer blockquote { border-left: 4px solid #3b82f6; padding-left: 1em; color: #666; background: #f8fafc; padding: 10px; border-radius: 4px; }
@@ -135,18 +138,29 @@
         .btn-apply { background: var(--crous-primary); width: auto; padding: 6px 12px; font-size: 12px; border: none; color: white; border-radius: 4px; cursor: pointer; }
         .ai-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 16px; background-color: #fff; border: 1px solid var(--crous-primary); color: var(--crous-primary); text-decoration: none; border-radius: 20px; font-size: 13px; font-weight: 600; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .ai-link:hover { background-color: var(--crous-primary); color: white; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-
     </style>
 </head>
-<body class="flex">
+<body class="flex relative">
+
+    <div id="mobileOverlay" class="fixed inset-0 bg-black/40 z-20 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
 
     <div id="hl-floating-btn" class="hidden" onclick="executeHighlight()">
         <i class="fas fa-highlighter mr-1"></i> 划线笔记
     </div>
 
-    <aside class="sidebar flex flex-col h-full">
-        <div class="p-8"><h1 id="libName" onclick="handleRename()" class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent cursor-pointer">我的书库</h1></div>
-        <nav class="flex-1 px-4 space-y-1 overflow-y-auto">
+    <aside id="sidebar" class="sidebar flex flex-col h-full fixed md:relative z-30 transform -translate-x-full md:translate-x-0">
+        <div class="p-8 pb-4">
+            <h1 id="libName" onclick="handleRename()" class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent cursor-pointer">我的书库</h1>
+        </div>
+        
+        <div class="px-6 pb-2">
+            <div class="relative">
+                <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="renderGrid()" placeholder="搜索藏书..." class="w-full bg-gray-100/80 border border-transparent focus:border-blue-200 focus:bg-white rounded-xl py-2 pl-8 pr-3 text-xs outline-none transition shadow-sm placeholder-gray-400 text-gray-600">
+            </div>
+        </div>
+
+        <nav class="flex-1 px-4 space-y-1 overflow-y-auto mt-2">
             <button id="nav-library" onclick="switchMainView('library')" class="w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl transition bg-white text-blue-600 shadow-sm"><i class="fas fa-layer-group w-8"></i> 全部藏书</button>
             
             <div class="pt-4 pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Crous 工具集</div>
@@ -159,22 +173,32 @@
             <div class="pt-6 pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">子目录</div>
             <div id="dirList" class="space-y-1"></div>
         </nav>
-        <div class="p-4 border-t border-gray-100">
+        
+        <div class="p-4 border-t border-gray-100 bg-white">
             <button onclick="triggerScan()" class="w-full py-3 bg-blue-600 text-white rounded-2xl text-xs font-bold shadow-lg mb-2 flex justify-center items-center"><i class="fas fa-folder-plus mr-2"></i> 添加 / 扫描书籍</button>
             <input type="file" id="fallbackDirInput" webkitdirectory directory multiple accept=".epub,.pdf,.txt,.md" class="hidden" onchange="handleFallbackImport(event)">
             <input type="file" id="fallbackFileInput" multiple accept=".epub,.pdf,.txt,.md" class="hidden" onchange="handleFallbackImport(event)">
             
-            <div class="grid grid-cols-2 gap-2">
-                <button onclick="exportIndexOnly()" class="py-2 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-bold">导出索引</button>
-                <button onclick="document.getElementById('importInput').click()" class="py-2 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-bold">导入索引</button>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <button onclick="exportIndexOnly()" class="py-2 bg-gray-50 text-gray-500 hover:bg-gray-100 transition rounded-xl text-[10px] font-bold">导出索引</button>
+                <button onclick="document.getElementById('importInput').click()" class="py-2 bg-gray-50 text-gray-500 hover:bg-gray-100 transition rounded-xl text-[10px] font-bold">导入索引</button>
             </div>
             <input type="file" id="importInput" class="hidden" accept=".json" onchange="importIndexOnly(event)">
+
+            <button onclick="document.getElementById('donateModal').classList.remove('hidden')" class="w-full py-2 text-[10px] font-bold text-gray-400 hover:text-pink-500 transition mt-1 flex items-center justify-center">
+                <i class="fas fa-coffee mr-1.5"></i> 赞赏支持 Crous
+            </button>
         </div>
     </aside>
 
-    <main class="flex-1 overflow-y-auto bg-gray-50 relative">
-        <header class="h-16 px-8 flex items-center justify-between sticky top-0 bg-gray-50/80 backdrop-blur-md z-10">
-            <h2 id="currentCategory" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Stable v3.4</h2>
+    <main class="flex-1 overflow-y-auto bg-gray-50 relative min-w-0">
+        <header class="h-16 px-4 md:px-8 flex items-center justify-between sticky top-0 bg-gray-50/80 backdrop-blur-md z-10">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="md:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-white shadow-sm text-gray-500 hover:text-blue-600 focus:outline-none">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h2 id="currentCategory" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Stable v3.4</h2>
+            </div>
             <button onclick="clearCache()" class="text-[10px] font-bold text-red-400 hover:text-red-600 transition">重置所有缓存</button>
         </header>
         
@@ -305,8 +329,8 @@
                 <button onclick="togglePanel('settings-panel')" class="p-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold transition"><i class="fas fa-cog"></i></button>
                 <button id="nightToggle" onclick="toggleNightMode()" class="p-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold transition"><i class="fas fa-moon"></i></button>
             </div>
-            <div id="readerTitle" class="text-xs font-bold text-gray-400 truncate max-w-sm italic">书名</div>
-            <div class="flex items-center space-x-3">
+            <div id="readerTitle" class="text-xs font-bold text-gray-400 truncate max-w-sm italic ml-4">书名</div>
+            <div class="flex items-center space-x-3 ml-auto">
                 <button onclick="doPrev()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-left"></i></button>
                 <span id="progTag" class="text-[10px] font-bold bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full min-w-[70px] text-center italic">0%</span>
                 <button onclick="doNext()" class="p-2 text-gray-300 hover:text-blue-600"><i class="fas fa-chevron-right"></i></button>
@@ -374,7 +398,46 @@
         <div class="w-64 bg-white p-8 rounded-3xl shadow-2xl"><div class="h-1 w-full bg-gray-100 rounded-full overflow-hidden mb-4"><div id="scanBar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div></div><p id="scanText" class="text-[10px] font-bold text-gray-400 tracking-widest uppercase italic font-mono">Syncing Library...</p></div>
     </div>
 
+    <div id="donateModal" class="fixed inset-0 bg-black/60 z-[6000] hidden flex items-center justify-center backdrop-blur-sm transition-opacity" onclick="this.classList.add('hidden')">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 text-center relative transform transition-all" onclick="event.stopPropagation()">
+            <button onclick="document.getElementById('donateModal').classList.add('hidden')" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <div class="w-14 h-14 bg-pink-50 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+                <i class="fas fa-heart"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2 text-gray-800">感谢你的支持！</h3>
+            <p class="text-xs text-gray-500 mb-6 leading-relaxed">开发不易，如果 Crous 帮助到了你，<br>欢迎请作者喝杯咖啡 ☕️，你的支持是我最大的动力！</p>
+            
+            <div class="flex justify-center gap-6 mb-2">
+                <div class="text-center group">
+                    <div class="p-2 border-2 border-green-100 rounded-2xl group-hover:border-green-400 transition">
+                        <img src="https://i.imgs.ovh/2026/03/11/OFYe9e.png" alt="WeChat Pay" class="w-24 h-24 object-cover rounded-xl bg-gray-50" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YwZjRmOCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOWNhM2FmIiBmb250LXNpemU9IjEyIj7lvq7kv6E8L3RleHQ+PC9zdmc+'">
+                    </div>
+                    <p class="text-[10px] font-bold text-green-600 mt-3"><i class="fab fa-weixin mr-1"></i>微信支付</p>
+                </div>
+                
+                <div class="text-center group">
+                    <div class="p-2 border-2 border-blue-100 rounded-2xl group-hover:border-blue-400 transition">
+                        <img src="https://i.imgs.ovh/2026/03/11/OFY8vh.png" alt="AliPay" class="w-24 h-24 object-cover rounded-xl bg-gray-50" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YwZjRmOCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOWNhM2FmIiBmb250LXNpemU9IjEyIj7mlK/ku5jlrp08L3RleHQ+PC9zdmc+'">
+                    </div>
+                    <p class="text-[10px] font-bold text-blue-600 mt-3"><i class="fab fa-alipay mr-1"></i>支付宝</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // --- 新增：移动端侧边栏切换逻辑 ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+
+        // --- 修改：视图切换时如果在移动端则自动收起侧边栏 ---
         function switchMainView(view) {
             document.getElementById('view-library').style.display = 'none';
             document.getElementById('view-crousimg').style.display = 'none';
@@ -398,6 +461,12 @@
             } else if (view === 'hb16') {
                 document.getElementById('nav-hb16').className = "w-full text-left px-4 py-3 text-sm font-semibold rounded-2xl transition bg-white text-purple-600 shadow-sm";
                 document.getElementById('currentCategory').innerText = "Crous - 智能画本";
+            }
+
+            // 移动端自动收起侧边栏
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+                document.getElementById('mobileOverlay').classList.add('hidden');
             }
         }
 
@@ -502,7 +571,6 @@
             renderBookTags(); 
             renderNotesPanel(); 
 
-            // --- 核心修复：隐藏/显示侧边翻页区，防止遮挡 TXT/MD 滚动条 ---
             const ext = book.path.split('.').pop().toLowerCase();
             const flipZones = document.querySelectorAll('.flip-zone');
             if (ext === 'txt' || ext === 'md') {
@@ -510,7 +578,12 @@
             } else {
                 flipZones.forEach(z => z.style.display = 'flex');
             }
-            // -------------------------------------------------------------
+
+            // 移动端点开书籍时自动收起侧边栏
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+                document.getElementById('mobileOverlay').classList.add('hidden');
+            }
 
             try {
                 if (book.handle) {
@@ -667,12 +740,10 @@
             } catch(e) {}
         }
 
-        // --- 核心修复：精准的 GBK 降级检测 ---
         function initMd(buf) {
             const v = document.getElementById('md-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('txt-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
             
             let text = new TextDecoder('utf-8').decode(buf); 
-            // 如果包含 Unicode 替换字符 \uFFFD，说明 UTF-8 解码失败，强制降级 GBK
             if(text.includes('\uFFFD')) {
                 text = new TextDecoder('gbk').decode(buf);
             }
@@ -686,7 +757,6 @@
             const v = document.getElementById('txt-viewer'); v.style.display = 'block'; document.getElementById('epub-viewer').style.display='none'; document.getElementById('md-viewer').style.display='none'; document.getElementById('pdf-viewer').classList.add('hidden');
             
             let text = new TextDecoder('utf-8').decode(buf); 
-            // 同样增加精准降级判断
             if(text.includes('\uFFFD')) {
                 text = new TextDecoder('gbk').decode(buf);
             }
@@ -695,14 +765,49 @@
             setTimeout(() => { v.scrollTop = (currentBook.txtPos || 0) * v.scrollHeight; }, 100);
             v.onscroll = () => { const pos = v.scrollTop / v.scrollHeight; window.updateProgress(pos*100, { txtPos: pos }); document.getElementById('progTag').innerText = (pos * 100).toFixed(1) + '%'; };
         }
-        // ------------------------------------
 
         async function extractCover(buf, path) { return new Promise(async (resolve) => { try { if (path.endsWith('.epub')) { const book = ePub(buf); const url = await book.coverUrl(); if (url) { const res = await fetch(url); const blob = await res.blob(); const rd = new FileReader(); rd.onloadend = () => { book.destroy(); resolve(rd.result); }; rd.readAsDataURL(blob); } else { book.destroy(); resolve(""); } } else if (path.endsWith('.pdf')) { const pdf = await pdfjs.getDocument(buf).promise; const page = await pdf.getPage(1); const cv = document.createElement('canvas'); const vp = page.getViewport({ scale: 0.3 }); cv.width = vp.width; cv.height = vp.height; await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise; const data = cv.toDataURL("image/jpeg", 0.6); pdf.destroy(); resolve(data); } else resolve(""); } catch (e) { resolve(""); } }); }
         
         async function startScan() { try { rootHandle = await window.showDirectoryPicker(); db.transaction("config","readwrite").objectStore("config").put({id:"root", handle:rootHandle}); document.getElementById('scanOverlay').classList.remove('hidden'); let files = []; async function walk(h, p) { for await (const e of h.values()) { const rel = p ? `${p}/${e.name}` : e.name; if(e.kind==='file' && ['pdf','epub','txt','md'].includes(e.name.split('.').pop().toLowerCase())) files.push({h:e, p:rel}); else if(e.kind==='directory') await walk(e, rel); } } await walk(rootHandle, ""); for(let i=0; i<files.length; i++){ document.getElementById('scanBar').style.width = ((i+1)/files.length*100)+'%'; await new Promise(r => setTimeout(r, 20)); try { await saveBook(files[i].h, files[i].p); } catch(err) { } } } catch(e) { } finally { document.getElementById('scanOverlay').classList.add('hidden'); renderGrid(); } }
         async function saveBook(h, p) { const txR = db.transaction("books","readonly"); const ex = await new Promise(r => { txR.objectStore("books").get(p).onsuccess=e=>r(e.target.result); }); let cover = ""; if (ex && ex.cover) { cover = ex.cover; } else { try { const file = await h.getFile(); const buf = await file.arrayBuffer(); cover = await extractCover(buf, p); } catch(e) { } } db.transaction("books","readwrite").objectStore("books").put({ title:h.name, path:p, handle:h, cover, progress:ex?Number(ex.progress):0, lastPage:ex?ex.lastPage:1, notes:ex?ex.notes:[], type:p.split('.').pop().toUpperCase(), folder:p.includes('/')?p.split('/')[0]:'根目录', tags:ex?ex.tags:[] }); }
         
-        function renderGrid(filter = 'all') { if(!db) return; const grid = document.getElementById('libraryGrid'); grid.innerHTML = ''; const dirs = new Set(), tags = new Set(), all = []; db.transaction("books", "readonly").objectStore("books").openCursor().onsuccess = e => { const c = e.target.result; if(c) { all.push(c.value); (c.value.tags || []).forEach(t => { tags.add(t); globalTags.add(t); }); dirs.add(c.value.folder); c.continue(); } else { all.sort((a,b) => (Number(b.progress)||0) - (Number(a.progress)||0)).forEach(b => { if(filter === 'all' || b.folder === filter || (b.tags && b.tags.includes(filter))) { const p = Number(b.progress) || 0; const div = document.createElement('div'); div.className = "book-card flex flex-col cursor-pointer"; div.onclick = () => openReader(b); let cvHTML = b.cover ? `<img src="${b.cover}" class="w-full h-full object-cover">` : `<div class="no-cover-label">${b.title}</div>`; div.innerHTML = `<div class="cover-box mb-3">${cvHTML}<div class="absolute bottom-2 right-2 ${p>=99.5?'bg-green-500':'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-lg">${p>=99.5?'已阅读':p.toFixed(0)+'%'}</div></div><h3 class="text-[11px] font-bold text-gray-700 line-clamp-2 px-1 leading-tight">${b.title}</h3>`; grid.appendChild(div); } }); document.getElementById('tagList').innerHTML = Array.from(tags).map(t => `<span onclick="renderGrid('${t}')" class="tag-pill">${t}</span>`).join(''); document.getElementById('dirList').innerHTML = Array.from(dirs).map(d => `<button onclick="renderGrid('${d}')" class="w-full text-left px-4 py-2 text-[10px] text-gray-400 hover:text-blue-600 font-bold truncate">📁 ${d}</button>`).join(''); updateSuggestedTagsUI(); } }; }
+        // --- 修改：renderGrid 增加搜索框动态过滤逻辑 ---
+        function renderGrid(filter = 'all') { 
+            if(!db) return; 
+            const grid = document.getElementById('libraryGrid'); grid.innerHTML = ''; 
+            const dirs = new Set(), tags = new Set(), all = []; 
+            const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase(); // 获取搜索词
+
+            db.transaction("books", "readonly").objectStore("books").openCursor().onsuccess = e => { 
+                const c = e.target.result; 
+                if(c) { 
+                    all.push(c.value); 
+                    (c.value.tags || []).forEach(t => { tags.add(t); globalTags.add(t); }); 
+                    dirs.add(c.value.folder); 
+                    c.continue(); 
+                } else { 
+                    all.sort((a,b) => (Number(b.progress)||0) - (Number(a.progress)||0)).forEach(b => { 
+                        
+                        // 匹配逻辑：名称必须包含搜索词
+                        const matchSearch = b.title.toLowerCase().includes(searchQuery);
+                        const matchFilter = (filter === 'all' || b.folder === filter || (b.tags && b.tags.includes(filter)));
+
+                        if(matchFilter && matchSearch) { 
+                            const p = Number(b.progress) || 0; 
+                            const div = document.createElement('div'); 
+                            div.className = "book-card flex flex-col cursor-pointer"; 
+                            div.onclick = () => openReader(b); 
+                            let cvHTML = b.cover ? `<img src="${b.cover}" class="w-full h-full object-cover">` : `<div class="no-cover-label">${b.title}</div>`; 
+                            div.innerHTML = `<div class="cover-box mb-3">${cvHTML}<div class="absolute bottom-2 right-2 ${p>=99.5?'bg-green-500':'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-lg">${p>=99.5?'已阅读':p.toFixed(0)+'%'}</div></div><h3 class="text-[11px] font-bold text-gray-700 line-clamp-2 px-1 leading-tight">${b.title}</h3>`; 
+                            grid.appendChild(div); 
+                        } 
+                    }); 
+                    document.getElementById('tagList').innerHTML = Array.from(tags).map(t => `<span onclick="renderGrid('${t}')" class="tag-pill">${t}</span>`).join(''); 
+                    document.getElementById('dirList').innerHTML = Array.from(dirs).map(d => `<button onclick="renderGrid('${d}')" class="w-full text-left px-4 py-2 text-[10px] text-gray-400 hover:text-blue-600 font-bold truncate">📁 ${d}</button>`).join(''); 
+                    updateSuggestedTagsUI(); 
+                } 
+            }; 
+        }
         
         window.updateProgress = (p, ex) => { if(!currentBook) return; const tx = db.transaction("books","readwrite"); tx.objectStore("books").get(currentBook.path).onsuccess = e => { const b = e.target.result; if(b){ b.progress = Number(p); Object.assign(b, ex); tx.objectStore("books").put(b); } }; };
         window.updateMode = (m) => { let lastCfi = currentRendition ? currentRendition.currentLocation()?.start?.cfi : null; prefs.mode = m; updateModeBtnUI(); savePrefs(); if (currentBook.type === 'EPUB') initEpub(currentBookBuffer, lastCfi); else if (currentBook.type === 'PDF') renderPDF(currentBook.lastPage); };
